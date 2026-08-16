@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>MindMap Studio</title>
 <link rel="stylesheet" href="styles.css" />
 </head>
@@ -24,10 +24,12 @@
     </div>
   </aside>
 
-  <main id="workspace">
-    <button id="toggleSidebar" title="Toggle sidebar">☰</button>
+  <div id="sidebarBackdrop" class="hidden" aria-hidden="true"></div>
 
-    <div class="toolbar">
+  <main id="workspace">
+    <button id="toggleSidebar" title="Toggle sidebar" aria-label="Toggle sidebar">☰</button>
+
+    <div class="toolbar" aria-label="Mind map controls">
       <button id="zoomOut" title="Zoom out">−</button>
       <div class="zoomread" id="zoomRead">100%</div>
       <button id="zoomIn" title="Zoom in">+</button>
@@ -105,5 +107,49 @@
 </div>
 
 <script src="app.js"></script>
+<script>
+(() => {
+  const mobile = window.matchMedia('(max-width: 768px)');
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  const toggle = document.getElementById('toggleSidebar');
+
+  function syncMobileSidebar(forceClosed = false) {
+    if (!mobile.matches) {
+      backdrop.classList.add('hidden');
+      return;
+    }
+    if (forceClosed) sidebar.classList.add('collapsed');
+    backdrop.classList.toggle('hidden', sidebar.classList.contains('collapsed'));
+  }
+
+  if (mobile.matches) syncMobileSidebar(true);
+
+  toggle.addEventListener('click', () => requestAnimationFrame(() => syncMobileSidebar(false)));
+  backdrop.addEventListener('click', () => {
+    sidebar.classList.add('collapsed');
+    syncMobileSidebar(false);
+    setTimeout(() => typeof fitView === 'function' && fitView(), 240);
+  });
+
+  document.getElementById('projects').addEventListener('click', e => {
+    if (mobile.matches && e.target.closest('.project') && !e.target.closest('.menu')) {
+      setTimeout(() => {
+        sidebar.classList.add('collapsed');
+        syncMobileSidebar(false);
+      }, 80);
+    }
+  });
+
+  mobile.addEventListener?.('change', () => {
+    if (mobile.matches) syncMobileSidebar(true);
+    else {
+      sidebar.classList.remove('collapsed');
+      backdrop.classList.add('hidden');
+      setTimeout(() => typeof fitView === 'function' && fitView(), 250);
+    }
+  });
+})();
+</script>
 </body>
 </html>
