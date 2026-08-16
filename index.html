@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MindMap Studio</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar">
+    <div class="side-head">
+      <div class="brand">
+        <div class="brand-mark">M</div>
+        <div>MindMap Studio<small>Local Presentation App</small></div>
+      </div>
+      <button class="new-btn" id="newProject">+ New JSON Project</button>
+    </div>
+    <div class="project-label">Projects</div>
+    <div id="projects"></div>
+    <div class="side-foot">
+      Projects are stored only in this browser using <b>localStorage</b>.<br>
+      No server or internet is required.
+    </div>
+  </aside>
+
+  <main id="workspace">
+    <button id="toggleSidebar" title="Toggle sidebar">☰</button>
+
+    <div class="toolbar">
+      <button id="zoomOut" title="Zoom out">−</button>
+      <div class="zoomread" id="zoomRead">100%</div>
+      <button id="zoomIn" title="Zoom in">+</button>
+      <div class="divider"></div>
+      <button id="fitBtn">Fit View</button>
+      <button id="expandBtn">Expand All</button>
+      <button id="collapseBtn">Collapse</button>
+      <div class="divider"></div>
+      <button id="editBtn">Edit JSON</button>
+      <button id="fullBtn" title="Fullscreen">⛶</button>
+    </div>
+
+    <svg id="canvas" viewBox="0 0 1600 900" aria-label="Interactive mind map">
+      <defs>
+        <filter id="shadow" x="-20%" y="-25%" width="140%" height="160%">
+          <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#111827" flood-opacity=".10"/>
+        </filter>
+        <filter id="tinyShadow" x="-40%" y="-40%" width="180%" height="180%">
+          <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#111827" flood-opacity=".14"/>
+        </filter>
+      </defs>
+      <g id="viewport">
+        <g id="links"></g>
+        <g id="nodes"></g>
+      </g>
+    </svg>
+
+    <div class="hint">Click a card to open/close • Drag or two-finger scroll to pan • Ctrl/Cmd + scroll to zoom</div>
+    <div class="empty" id="empty">
+      <div>
+        <h2>Create your first mind map</h2>
+        <p>Paste a JSON tree and the app will automatically turn it into an interactive, expandable presentation map.</p>
+        <button id="emptyCreate">Create Project</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="modalTitle">New JSON Project</h2>
+      <button class="close" id="closeModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Project Name</label>
+        <input id="projectName" placeholder="e.g. Coding Roadmap 2026">
+      </div>
+      <div class="format-help">
+        JSON can be either a root node directly, or <code>{"title":"Project name","data":{...}}</code>.<br>
+        Each node supports: <code>label</code>, optional <code>color</code>, and optional <code>children</code>. Example:
+        <code>{"label":"START","children":[{"label":"Foundation","color":"#6ea8fe","children":[{"label":"Internet"}]}]}</code>
+      </div>
+      <div class="field">
+        <label>Mind Map JSON</label>
+        <textarea id="jsonInput" spellcheck="false"></textarea>
+        <div class="error" id="jsonError"></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="loadExample">Load Example</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn secondary" id="cancelModal">Cancel</button>
+        <button class="btn primary" id="saveProject">Save Project</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="menu-pop" id="projectMenu">
+  <button id="menuEdit">Edit JSON</button>
+  <button id="menuDuplicate">Duplicate</button>
+  <button class="danger" id="menuDelete">Delete</button>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
