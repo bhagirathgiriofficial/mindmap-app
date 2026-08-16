@@ -113,6 +113,8 @@
   const sidebar = document.getElementById('sidebar');
   const backdrop = document.getElementById('sidebarBackdrop');
   const toggle = document.getElementById('toggleSidebar');
+  const canvas = document.getElementById('canvas');
+  const controls = document.querySelector('.toolbar');
 
   function syncMobileSidebar(forceClosed = false) {
     if (!mobile.matches) {
@@ -141,13 +143,108 @@
     }
   });
 
+  /* Responsive Fit View: reserves room for mobile menu + control dock. */
+  const desktopFitView = fitView;
+  fitView = function responsiveFitView() {
+    if (!currentData) return;
+    if (!mobile.matches) return desktopFitView();
+
+    render();
+    const bb = viewport.getBBox();
+    if (!bb.width || !bb.height) return;
+
+    const w = workspace.clientWidth;
+    const h = workspace.clientHeight;
+    const sidePad = 20;
+    const topPad = 70;
+    const bottomPad = (controls?.offsetHeight || 100) + 22;
+    const usableW = Math.max(100, w - sidePad * 2);
+    const usableH = Math.max(100, h - topPad - bottomPad);
+    const k = Math.max(.18, Math.min(1.15, Math.min(usableW / bb.width, usableH / bb.height)));
+
+    transform.k = k;
+    transform.x = sidePad + (usableW - bb.width * k) / 2 - bb.x * k;
+    transform.y = topPad + (usableH - bb.height * k) / 2 - bb.y * k;
+    applyTransform();
+  };
+  document.getElementById('fitBtn').onclick = fitView;
+
+  /* Native two-finger pinch zoom + pinch pan. */
+  const pinch = {
+    active: false,
+    startDistance: 0,
+    startCenter: null,
+    startTransform: null,
+    suppressClickUntil: 0
+  };
+
+  const distance = (a, b) => Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+  const center = (a, b) => ({x:(a.clientX + b.clientX) / 2, y:(a.clientY + b.clientY) / 2});
+
+  canvas.addEventListener('touchstart', e => {
+    if (e.touches.length !== 2) return;
+    e.preventDefault();
+
+    dragging = false;
+    canvas.classList.remove('dragging');
+
+    const a = e.touches[0], b = e.touches[1];
+    pinch.active = true;
+    pinch.startDistance = Math.max(1, distance(a, b));
+    pinch.startCenter = center(a, b);
+    pinch.startTransform = {...transform};
+  }, {passive:false});
+
+  canvas.addEventListener('touchmove', e => {
+    if (!pinch.active || e.touches.length !== 2) return;
+    e.preventDefault();
+
+    const a = e.touches[0], b = e.touches[1];
+    const currentDistance = Math.max(1, distance(a, b));
+    const currentCenter = center(a, b);
+    const rect = canvas.getBoundingClientRect();
+
+    const startK = pinch.startTransform.k;
+    const nextK = Math.max(.18, Math.min(3.2, startK * (currentDistance / pinch.startDistance)));
+
+    const startPx = pinch.startCenter.x - rect.left;
+    const startPy = pinch.startCenter.y - rect.top;
+    const worldX = (startPx - pinch.startTransform.x) / startK;
+    const worldY = (startPy - pinch.startTransform.y) / startK;
+
+    const nowPx = currentCenter.x - rect.left;
+    const nowPy = currentCenter.y - rect.top;
+
+    transform.k = nextK;
+    transform.x = nowPx - worldX * nextK;
+    transform.y = nowPy - worldY * nextK;
+    applyTransform();
+  }, {passive:false});
+
+  const finishPinch = e => {
+    if (!pinch.active) return;
+    if (e.touches && e.touches.length >= 2) return;
+    pinch.active = false;
+    pinch.suppressClickUntil = Date.now() + 350;
+  };
+  canvas.addEventListener('touchend', finishPinch, {passive:true});
+  canvas.addEventListener('touchcancel', finishPinch, {passive:true});
+
+  /* Prevent a node from accidentally opening after a pinch gesture. */
+  canvas.addEventListener('click', e => {
+    if (Date.now() < pinch.suppressClickUntil) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
+
   mobile.addEventListener?.('change', () => {
     if (mobile.matches) syncMobileSidebar(true);
     else {
       sidebar.classList.remove('collapsed');
       backdrop.classList.add('hidden');
-      setTimeout(() => typeof fitView === 'function' && fitView(), 250);
     }
+    setTimeout(() => typeof fitView === 'function' && fitView(), 250);
   });
 })();
 </script>
