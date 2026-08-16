@@ -274,10 +274,16 @@ function setAll(expanded){
 }
 function collapseToRoot(){
   if(!currentData)return;
-  nodeState.forEach(n=>{if(n.children&&n.children.length)n.expanded=false});
-  currentData.expanded=true;render();setTimeout(fitView,20);
+  nodeState.forEach(n=>{
+    if(n.children&&n.children.length)n.expanded=false;
+  });
+  // True collapse-all: leave only the root node visible.
+  currentData.expanded=false;
+  render();
+  setTimeout(fitView,20);
 }
 
+/* Modal */
 function openModal(mode,id=null){
   editingId=id;jsonError.classList.remove("show");jsonError.textContent="";
   if(mode==="edit"&&id){
@@ -314,6 +320,7 @@ function openProjectMenu(id,anchor){
 }
 document.addEventListener("click",e=>{if(!menu.contains(e.target))menu.classList.remove("show")});
 
+/* Project menu actions */
 document.getElementById("menuEdit").onclick=()=>{menu.classList.remove("show");openModal("edit",menuProjectId)};
 document.getElementById("menuDuplicate").onclick=()=>{
   const p=projects.find(x=>x.id===menuProjectId);if(!p)return;
@@ -328,6 +335,7 @@ document.getElementById("menuDelete").onclick=()=>{
   persist();renderProjectList();loadCurrentProject();menu.classList.remove("show");
 };
 
+/* Controls */
 document.getElementById("newProject").onclick=()=>openModal("new");
 document.getElementById("emptyCreate").onclick=()=>openModal("new");
 document.getElementById("editBtn").onclick=()=>{if(activeId)openModal("edit",activeId)};
@@ -356,6 +364,7 @@ document.addEventListener("keydown",e=>{
   if(e.key==="Escape"&&overlay.classList.contains("show"))closeModal();
 });
 
+/* First run */
 if(!projects.length){
   const starter={id:uid(),name:EXAMPLE.title,data:sanitizeNode(EXAMPLE.data),createdAt:Date.now(),updatedAt:Date.now()};
   projects=[starter];activeId=starter.id;persist();
