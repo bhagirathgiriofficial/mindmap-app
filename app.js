@@ -237,10 +237,12 @@ function drawNodes(n){
   if(n.children&&n.children.length){
     const cx=n._w+13,cy=n._h/2;
     const badge=document.createElementNS(NS,"circle");badge.setAttribute("cx",cx);badge.setAttribute("cy",cy);badge.setAttribute("r","11");badge.setAttribute("class","badge-circle");
-    badge.setAttribute("stroke",n.root?"#22252a":n.topColor);g.appendChild(badge);
+    badge.setAttribute("stroke",n.root?"#22252a":n.topColor);badge.style.pointerEvents="all";g.appendChild(badge);
     const txt=document.createElementNS(NS,"text");txt.setAttribute("x",cx);txt.setAttribute("y",cy+.3);txt.setAttribute("class","badge-text");
     txt.setAttribute("fill",n.root?"#22252a":shade(n.topColor,-40));txt.textContent=n.expanded?"−":"+";g.appendChild(txt);
   }
+  // Node interactions must win over canvas drag/pointer capture.
+  g.addEventListener("pointerdown",e=>e.stopPropagation());
   g.addEventListener("click",e=>{e.stopPropagation();if(n.children&&n.children.length){n.expanded=!n.expanded;render()}});
   nodesG.appendChild(g);visibleChildren(n).forEach(drawNodes);
 }
@@ -260,7 +262,8 @@ svg.addEventListener("wheel",e=>{
   transform.x-=e.deltaX;transform.y-=e.deltaY;applyTransform();
 },{passive:false});
 svg.addEventListener("pointerdown",e=>{
-  if(e.button!==0)return;dragging=true;svg.classList.add("dragging");
+  // Start panning only from empty canvas space, never from a node/card.
+  if(e.button!==0 || e.target.closest?.(".node"))return;dragging=true;svg.classList.add("dragging");
   dragStart={x:e.clientX,y:e.clientY,tx:transform.x,ty:transform.y};svg.setPointerCapture(e.pointerId);
 });
 svg.addEventListener("pointermove",e=>{
