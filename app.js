@@ -4,43 +4,51 @@ const ACTIVE_KEY="mindmap_studio_active_v1";
 const COLORS=["#6ea8fe","#a78bfa","#43c7a4","#ffb456","#ef83c6","#5fcf82","#56b6d8","#f08a79"];
 
 const EXAMPLE={
-  title:"Coding Roadmap",
+  title:"How to Use MindMap Studio",
   data:{
-    label:"START TODAY",
+    label:"HOW TO USE MINDMAP STUDIO",
     children:[
-      {label:"01 FOUNDATION",color:"#6ea8fe",children:[
-        {label:"How does a computer work?",children:[
-          {label:"Hardware vs Software"},{label:"CPU • Memory • Storage"},{label:"What is a Program?"}
-        ]},
-        {label:"How does the Internet work?",children:[
-          {label:"Network basics"},{label:"IP Address & DNS"},{label:"HTTP / HTTPS"}
-        ]},
-        {label:"Browser"},
-        {label:"Client vs Server"},
-        {label:"API & Database basics"}
+      {label:"01 START HERE",color:"#6ea8fe",children:[
+        {label:"Click + New JSON Project"},
+        {label:"Give your project a name"},
+        {label:"Paste your JSON"},
+        {label:"Click Save Project"}
       ]},
-      {label:"02 PROGRAMMING",color:"#a78bfa",children:[
-        {label:"JavaScript"},{label:"Variables & Data Types"},{label:"Conditions"},{label:"Loops"},
-        {label:"Functions"},{label:"Arrays & Objects"},{label:"Basic Problem Solving"}
+      {label:"02 CREATE JSON WITH AI",color:"#a78bfa",children:[
+        {label:"Write your topic or idea"},
+        {label:"Give AI the sample JSON format"},
+        {label:"Ask it to generate mind-map JSON"},
+        {label:"Copy the JSON here"}
       ]},
-      {label:"03 WEB DEVELOPMENT",color:"#43c7a4",children:[
-        {label:"HTML",children:[{label:"Semantic Structure"},{label:"Forms"}]},
-        {label:"CSS",children:[{label:"Box Model"},{label:"Flexbox & Grid"},{label:"Responsive Design"}]},
-        {label:"DOM"},{label:"Events"},{label:"Fetch API"},{label:"Async JavaScript"}
+      {label:"03 JSON STRUCTURE",color:"#43c7a4",children:[
+        {label:"label = node text"},
+        {label:"color = branch color"},
+        {label:"children = sub-items",children:[
+          {label:"Children can have more children"},
+          {label:"Build as many levels as needed"}
+        ]}
       ]},
-      {label:"04 BUILD",color:"#ffb456",children:[
-        {label:"Developer Tools",children:[{label:"VS Code"},{label:"Terminal"},{label:"Git & GitHub"}]},
-        {label:"Small Projects",children:[{label:"Weather App"},{label:"Movie Search"},{label:"Expense Tracker"}]},
-        {label:"React / Frontend",children:[{label:"Components & Props"},{label:"State & Hooks"},{label:"Routing"},{label:"API Integration"}]},
-        {label:"Backend",children:[{label:"Node.js"},{label:"Express"},{label:"REST APIs"},{label:"Auth & Authorization"}]},
-        {label:"Database",children:[{label:"SQL / PostgreSQL"},{label:"or MongoDB"},{label:"CRUD & Data Modeling"}]},
-        {label:"Serious Full-Stack Project"}
+      {label:"04 INTERACT",color:"#ffb456",children:[
+        {label:"Click a node to expand"},
+        {label:"Click again to collapse"},
+        {label:"Drag canvas to pan"},
+        {label:"Two-finger scroll to pan"},
+        {label:"Ctrl / Cmd + scroll to zoom"}
       ]},
-      {label:"05 AI THROUGHOUT",color:"#ef83c6",children:[
-        {label:"Explain"},{label:"Debug"},{label:"Code Review"},{label:"Refactor"},{label:"Generate Tests"},{label:"Documentation"}
+      {label:"05 PRESENT",color:"#ef83c6",children:[
+        {label:"Fit View"},
+        {label:"Expand All"},
+        {label:"Collapse All"},
+        {label:"Fullscreen mode"},
+        {label:"Hide sidebar while presenting"}
       ]},
-      {label:"06 JOB READY",color:"#5fcf82",children:[
-        {label:"Deployment"},{label:"DSA"},{label:"CS Fundamentals"},{label:"Portfolio"},{label:"Interview Practice"},{label:"Job Applications"}
+      {label:"06 MANAGE PROJECTS",color:"#5fcf82",children:[
+        {label:"Projects appear in the sidebar"},
+        {label:"Switch between projects"},
+        {label:"Edit JSON anytime"},
+        {label:"Duplicate a project"},
+        {label:"Delete projects you no longer need"},
+        {label:"Everything saves in localStorage"}
       ]}
     ]
   }
