@@ -16,12 +16,7 @@ button,input,textarea{font:inherit}
 button{touch-action:manipulation}
 #app{position:relative;width:100%;height:100%;height:100dvh;display:flex}
 
-#sidebar{
-  width:var(--sidebar);height:100%;background:rgba(255,255,255,.96);
-  border-right:1px solid rgba(23,25,29,.08);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
-  display:flex;flex-direction:column;z-index:20;transition:width .22s ease,transform .22s ease;
-  box-shadow:8px 0 28px rgba(23,25,29,.04);flex:0 0 auto
-}
+#sidebar{width:var(--sidebar);height:100%;background:rgba(255,255,255,.96);border-right:1px solid rgba(23,25,29,.08);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);display:flex;flex-direction:column;z-index:20;transition:width .22s ease,transform .22s ease;box-shadow:8px 0 28px rgba(23,25,29,.04);flex:0 0 auto}
 #sidebar.collapsed{width:0;overflow:hidden;border-right:0}
 .side-head{padding:18px 16px 14px;border-bottom:1px solid #eceef2;padding-top:max(18px,env(safe-area-inset-top))}
 .brand{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:850;letter-spacing:-.02em}
@@ -101,23 +96,29 @@ textarea{height:390px;resize:vertical;font-family:"SFMono-Regular",Consolas,"Lib
 @media(max-width:900px){
   :root{--sidebar:260px}
   .hint{display:none}
-  .toolbar{max-width:calc(100vw - 86px);overflow-x:auto;scrollbar-width:none}
-  .toolbar::-webkit-scrollbar{display:none}
 }
 
 @media(max-width:768px){
   body{background-size:24px 24px}
-  #sidebar{position:fixed;left:0;top:0;bottom:0;width:min(86vw,330px);height:100dvh;z-index:40;box-shadow:18px 0 50px rgba(20,24,32,.18);transform:translateX(0);transition:transform .24s ease;width .24s ease}
+  #sidebar{position:fixed;left:0;top:0;bottom:0;width:min(86vw,330px);height:100dvh;z-index:40;box-shadow:18px 0 50px rgba(20,24,32,.18);transform:translateX(0);transition:transform .24s ease,width .24s ease}
   #sidebar.collapsed{width:min(86vw,330px);transform:translateX(-105%);overflow:hidden;border-right:1px solid rgba(23,25,29,.08)}
   #sidebarBackdrop{position:fixed;inset:0;background:rgba(15,18,24,.28);z-index:35;display:block;opacity:1;transition:opacity .2s ease;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
   #sidebarBackdrop.hidden{opacity:0;pointer-events:none}
   #workspace{width:100vw;flex:1 1 100%}
-  #toggleSidebar{left:max(12px,env(safe-area-inset-left));top:max(12px,env(safe-area-inset-top));width:46px;height:46px;border-radius:14px;font-size:18px}
-  .toolbar{left:12px;right:12px;top:auto;bottom:max(12px,calc(env(safe-area-inset-bottom) + 8px));transform:none;max-width:none;width:auto;overflow-x:auto;justify-content:flex-start;gap:5px;padding:6px;border-radius:15px;scrollbar-width:none}
-  .toolbar::-webkit-scrollbar{display:none}
-  .toolbar button{height:42px;min-width:42px;padding:0 10px;font-size:12px}
-  .toolbar .divider{height:24px}
-  .zoomread{min-width:50px;font-size:12px}
+  #toggleSidebar{left:max(10px,env(safe-area-inset-left));top:max(10px,env(safe-area-inset-top));width:46px;height:46px;border-radius:14px;font-size:18px}
+
+  .toolbar{left:8px;right:8px;top:auto;bottom:max(8px,calc(env(safe-area-inset-bottom) + 6px));transform:none;max-width:none;width:auto;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:7px;border-radius:16px;overflow:visible}
+  .toolbar .divider,.toolbar .zoomread{display:none}
+  .toolbar button{width:100%;height:44px;min-width:0;padding:0 4px;font-size:0;border-radius:11px;background:#f7f8fa}
+  .toolbar button::after{display:block;font-size:11px;font-weight:800;line-height:1.05;white-space:normal}
+  #zoomOut::after{content:"Zoom −"}
+  #zoomIn::after{content:"Zoom +"}
+  #fitBtn::after{content:"Fit"}
+  #expandBtn::after{content:"Expand"}
+  #collapseBtn::after{content:"Collapse"}
+  #editBtn::after{content:"Edit"}
+  #fullBtn::after{content:"Full"}
+
   .node.root .label{font-size:23px}
   .node.depth-1 .label{font-size:17px}
   .overlay{padding:0;align-items:flex-end}
@@ -130,10 +131,10 @@ textarea{height:390px;resize:vertical;font-family:"SFMono-Regular",Consolas,"Lib
   .modal-actions>div .btn{flex:1}
   #loadExample{order:2;width:100%}
   .format-help{font-size:11px;max-height:135px;overflow:auto}
-  .empty{padding:86px 22px 90px}
+  .empty{padding:80px 22px 126px}
   .empty h2{font-size:22px}
   .empty p{font-size:14px}
-  .menu-pop{min-width:170px}
+  .menu-pop{min-width:170px;max-width:calc(100vw - 16px)}
 }
 
 @media(max-width:430px){
@@ -141,15 +142,21 @@ textarea{height:390px;resize:vertical;font-family:"SFMono-Regular",Consolas,"Lib
   #sidebar.collapsed{width:min(90vw,320px)}
   .side-head{padding-left:14px;padding-right:14px}
   .brand{font-size:16px}
-  .toolbar{left:8px;right:8px;bottom:max(8px,calc(env(safe-area-inset-bottom) + 5px));border-radius:14px}
-  .toolbar button{padding:0 9px}
-  .zoomread{min-width:46px}
+  .toolbar{left:6px;right:6px;bottom:max(6px,calc(env(safe-area-inset-bottom) + 4px));gap:5px;padding:6px}
+  .toolbar button{height:42px}
+  .toolbar button::after{font-size:10.5px}
   .modal-head h2{font-size:17px}
   .field input{min-height:46px}
 }
 
+@media(max-width:350px){
+  .toolbar{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .toolbar button{height:40px}
+}
+
 @media(orientation:landscape) and (max-height:520px){
-  .toolbar{top:8px;bottom:auto;left:70px;right:8px}
+  .toolbar{top:8px;bottom:auto;left:66px;right:8px;grid-template-columns:repeat(7,minmax(0,1fr));padding:5px}
+  .toolbar button{height:38px}
   #toggleSidebar{top:8px}
   .modal{max-height:98dvh}
   textarea{height:42dvh;min-height:160px}
