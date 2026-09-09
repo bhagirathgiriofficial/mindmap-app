@@ -244,6 +244,18 @@ function updateColorSelection(){
   }
   render();
 }
+function selectAllVisibleNodes(){
+  if(!currentData)return;
+  if(!colorMode)setColorMode(true);
+  cancelSelection();
+  selectedColorNodes.clear();
+  function visit(n){
+    selectedColorNodes.add(n);
+    visibleChildren(n).forEach(visit);
+  }
+  visit(currentData);
+  updateColorSelection();
+}
 function selectColorNode(n,additive=false){
   if(!additive)selectedColorNodes.clear();
   if(additive&&selectedColorNodes.has(n))selectedColorNodes.delete(n);
@@ -499,6 +511,12 @@ document.getElementById("fullBtn").onclick=async()=>{
 };
 window.addEventListener("resize",()=>setTimeout(fitView,80));
 document.addEventListener("keydown",e=>{
+  if((e.ctrlKey||e.metaKey)&&!e.altKey&&e.key.toLowerCase()==="a"){
+    const target=e.target;
+    if(overlay.classList.contains("show")||target.closest?.("input,textarea,select")||target.isContentEditable)return;
+    if(currentData){e.preventDefault();selectAllVisibleNodes()}
+    return;
+  }
   if(e.key==="Escape"&&colorMode)setColorMode(false);
   if(e.key==="Escape"&&overlay.classList.contains("show"))closeModal();
 });
