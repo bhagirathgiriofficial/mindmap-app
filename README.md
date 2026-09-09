@@ -98,6 +98,10 @@ Each node supports:
 
 Only visible nodes intersecting the selection rectangle are selected. Background colors save as `color`, and text colors save as `textColor` in each selected node's JSON. Changes appear in **Edit JSON** and persist after refreshing. Descendants without an explicit background color follow their branch color with a lighter fill; explicitly colored descendants keep their chosen colors. Text uses automatic contrast unless `textColor` is set.
 
+## Undo
+
+Click **Undo** or press **Ctrl+Z / Cmd+Z** to undo up to 10 color applications or saved JSON edits per project. A bulk color application counts as one step. Undo restores the saved JSON as well as the map. Histories remain available when switching projects during the current session and reset on page reload. Text fields and the JSON editor retain their native text undo.
+
 ## Storage
 
 Projects are stored locally in the browser using `localStorage`.

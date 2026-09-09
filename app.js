@@ -81,6 +81,8 @@ let transform={x:80,y:70,k:1};
 let dragging=false,dragStart=null;
 let editingId=null;
 let menuProjectId=null;
+const undoHistories=new Map();
+const UNDO_LIMIT=10;
 let colorMode=false;
 let selectedColorNodes=new Set();
 let selectionDrag=null;
@@ -150,6 +152,7 @@ function selectProject(id){
   loadCurrentProject();
 }
 function loadCurrentProject(){
+  updateUndoButton();
   setColorMode(false);
   const p=projects.find(x=>x.id===activeId);
   if(!p){
@@ -280,18 +283,59 @@ function saveNodeColor(){
     if(background)saved.color=colorInput.value;
     if(text)saved.textColor=textInput.value;
   }
+  if(JSON.stringify(previous)===JSON.stringify(p.data))return;
   p.updatedAt=Date.now();
   try{persist()}catch(error){
     p.data=previous;p.updatedAt=updatedAt;
     document.getElementById("nodeColorStatus").textContent="Could not save colors. Browser storage may be full.";
     return;
   }
+  recordUndo(p.id,{name:p.name,data:previous});
   for(const n of selectedColorNodes){
     if(background)n.color=colorInput.value;
     if(text)n.textColor=textInput.value;
   }
   indexTree(currentData);render();renderProjectList();
   document.getElementById("nodeColorStatus").textContent="Colors saved. JSON updated.";
+}
+function updateUndoButton(){
+  const count=undoHistories.get(activeId)?.length||0;
+  const button=document.getElementById("undoBtn");
+  button.disabled=!count;
+  button.textContent=count?`Undo (${count})`:"Undo";
+  button.title=`Undo last edit — Ctrl+Z / Cmd+Z (${count} of ${UNDO_LIMIT} steps available)`;
+}
+function recordUndo(id,snapshot){
+  const history=undoHistories.get(id)||[];
+  history.push(snapshot);
+  if(history.length>UNDO_LIMIT)history.shift();
+  undoHistories.set(id,history);
+  updateUndoButton();
+}
+function undoLastEdit(){
+  const p=projects.find(p=>p.id===activeId),history=undoHistories.get(activeId);
+  if(!p||!history?.length)return;
+  const snapshot=history[history.length-1];
+  const previous={name:p.name,data:p.data,updatedAt:p.updatedAt};
+  p.name=snapshot.name;p.data=deepCopy(snapshot.data);p.updatedAt=Date.now();
+  try{persist()}catch(error){
+    Object.assign(p,previous);
+    alert("Could not undo. Browser storage may be full. Your history is unchanged.");
+    return;
+  }
+  history.pop();
+  // Preserve expansion and canvas position while restoring saved content.
+  const restored=deepCopy(p.data);
+  function copyExpansion(oldNode,newNode){
+    if(!oldNode)return;
+    newNode.expanded=oldNode.expanded;
+    (newNode.children||[]).forEach((child,i)=>copyExpansion(oldNode.children?.[i],child));
+  }
+  copyExpansion(currentData,restored);
+  cancelSelection();selectedColorNodes.clear();
+  currentData=restored;indexTree(currentData);
+  updateColorSelection();renderProjectList();updateUndoButton();
+  document.getElementById("undoStatus").textContent="Edit undone. JSON updated.";
 }
 function selectionPoint(e){
   return new DOMPoint(e.clientX,e.clientY).matrixTransform(viewport.getScreenCTM().inverse());
@@ -447,13 +491,18 @@ function saveFromModal(){
     const name=projectName.value.trim()||"Untitled Mind Map";
     const normalized=normalizePayload(jsonInput.value,name);
     const finalName=projectName.value.trim()||normalized.title;
+    let undoSnapshot=null;
     if(editingId){
-      const p=projects.find(x=>x.id===editingId);p.name=finalName;p.data=normalized.data;p.updatedAt=Date.now();activeId=p.id;
+      const p=projects.find(x=>x.id===editingId);
+      if(p.name!==finalName||JSON.stringify(p.data)!==JSON.stringify(normalized.data))undoSnapshot={id:p.id,name:p.name,data:deepCopy(p.data)};
+      p.name=finalName;p.data=normalized.data;p.updatedAt=Date.now();activeId=p.id;
     }else{
       const p={id:uid(),name:finalName,data:normalized.data,createdAt:Date.now(),updatedAt:Date.now()};
       projects.unshift(p);activeId=p.id;
     }
-    persist();renderProjectList();closeModal();loadCurrentProject();
+    persist();
+    if(undoSnapshot)recordUndo(undoSnapshot.id,{name:undoSnapshot.name,data:undoSnapshot.data});
+    renderProjectList();closeModal();loadCurrentProject();
   }catch(err){
     jsonError.textContent=err.message||"Invalid JSON.";jsonError.classList.add("show");
   }
@@ -477,12 +526,14 @@ document.getElementById("menuDuplicate").onclick=()=>{
 document.getElementById("menuDelete").onclick=()=>{
   const p=projects.find(x=>x.id===menuProjectId);if(!p)return;
   if(!confirm(`Delete "${p.name}"?`))return;
+  undoHistories.delete(menuProjectId);
   projects=projects.filter(x=>x.id!==menuProjectId);
   if(activeId===menuProjectId)activeId=projects[0]?.id||null;
   persist();renderProjectList();loadCurrentProject();menu.classList.remove("show");
 };
 
 /* Controls */
+document.getElementById("undoBtn").onclick=undoLastEdit;
 document.getElementById("colorBtn").onclick=()=>setColorMode(!colorMode);
 document.getElementById("closeNodeColor").onclick=()=>setColorMode(false);
 colorSave.onclick=saveNodeColor;
@@ -511,6 +562,12 @@ document.getElementById("fullBtn").onclick=async()=>{
 };
 window.addEventListener("resize",()=>setTimeout(fitView,80));
 document.addEventListener("keydown",e=>{
+  if((e.ctrlKey||e.metaKey)&&!e.altKey&&!e.shiftKey&&e.key.toLowerCase()==="z"){
+    const target=e.target;
+    if(overlay.classList.contains("show")||target.closest?.("input,textarea,select")||target.isContentEditable)return;
+    if(currentData){e.preventDefault();undoLastEdit()}
+    return;
+  }
   if((e.ctrlKey||e.metaKey)&&!e.altKey&&e.key.toLowerCase()==="a"){
     const target=e.target;
     if(overlay.classList.contains("show")||target.closest?.("input,textarea,select")||target.isContentEditable)return;

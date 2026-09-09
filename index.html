@@ -38,6 +38,7 @@
       <button id="expandBtn">Expand All</button>
       <button id="collapseBtn">Collapse</button>
       <div class="divider"></div>
+      <button id="undoBtn" disabled>Undo</button>
       <button id="colorBtn" aria-pressed="false">Select & Color</button>
       <button id="editBtn">Edit JSON</button>
       <button id="fullBtn" title="Fullscreen">⛶</button>
@@ -73,6 +74,7 @@
       </g>
     </svg>
 
+    <span id="undoStatus" class="sr-only" role="status"></span>
     <div class="hint">Click a card to open/close • Drag or two-finger scroll to pan • Ctrl/Cmd + scroll to zoom</div>
     <div class="empty" id="empty">
       <div>
