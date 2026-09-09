@@ -38,16 +38,21 @@
       <button id="expandBtn">Expand All</button>
       <button id="collapseBtn">Collapse</button>
       <div class="divider"></div>
-      <button id="colorBtn" aria-pressed="false">Node Color</button>
+      <button id="colorBtn" aria-pressed="false">Select & Color</button>
       <button id="editBtn">Edit JSON</button>
       <button id="fullBtn" title="Fullscreen">⛶</button>
     </div>
 
     <div id="nodeColorPanel" class="node-color-panel" hidden>
       <span id="nodeColorName">Click a node to change its color</span>
-      <label for="nodeColorInput">Color</label>
+      <label><input type="checkbox" id="applyBackground" checked> Background</label>
+      <label for="nodeColorInput" class="sr-only">Background color</label>
       <input type="color" id="nodeColorInput" value="#6ea8fe" disabled>
-      <button id="saveNodeColor" disabled>Save color</button>
+      <label><input type="checkbox" id="applyText" checked> Text</label>
+      <label for="nodeTextColorInput" class="sr-only">Text color</label>
+      <input type="color" id="nodeTextColorInput" value="#1b1d22" disabled>
+      <small>Drag to select multiple nodes. Shift-click to add or remove. For mixed colors, pickers show the first selected node.</small>
+      <button id="saveNodeColor" disabled>Apply colors</button>
       <button id="closeNodeColor">Done</button>
       <span id="nodeColorStatus" role="status"></span>
     </div>
@@ -64,6 +69,7 @@
       <g id="viewport">
         <g id="links"></g>
         <g id="nodes"></g>
+        <rect id="selectionRect" visibility="hidden" pointer-events="none" />
       </g>
     </svg>
 
@@ -91,7 +97,7 @@
       </div>
       <div class="format-help">
         JSON can be either a root node directly, or <code>{"title":"Project name","data":{...}}</code>.<br>
-        Each node supports: <code>label</code>, optional <code>color</code>, and optional <code>children</code>. Example:
+        Each node supports: <code>label</code>, optional <code>color</code>, optional <code>textColor</code>, and optional <code>children</code>. Example:
         <code>{"label":"START","children":[{"label":"Foundation","color":"#6ea8fe","children":[{"label":"Internet"}]}]}</code>
       </div>
       <div class="field">
@@ -195,6 +201,7 @@
     if (e.touches.length !== 2) return;
     e.preventDefault();
 
+    if (typeof cancelSelection === "function") cancelSelection();
     dragging = false;
     canvas.classList.remove('dragging');
 

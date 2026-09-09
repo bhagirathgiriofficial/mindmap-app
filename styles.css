@@ -166,10 +166,17 @@ textarea{height:390px;resize:vertical;font-family:"SFMono-Regular",Consolas,"Lib
 .node-color-panel{position:absolute;top:80px;right:16px;z-index:11;display:flex;flex-wrap:wrap;align-items:center;gap:10px;width:min(340px,calc(100% - 32px));padding:14px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);font-size:13px}
 .node-color-panel[hidden]{display:none}
 #nodeColorName{width:100%;font-weight:750;overflow-wrap:anywhere}
-#nodeColorInput{width:48px;height:40px;padding:2px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer}
+#nodeColorInput,#nodeTextColorInput{width:48px;height:40px;padding:2px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer}
 .node-color-panel button{min-height:40px;border:0;border-radius:8px;padding:8px 12px;cursor:pointer}
 #saveNodeColor{background:#22252a;color:#fff}
 .node-color-panel button:disabled{opacity:.45;cursor:default}
 #nodeColorStatus{width:100%;font-size:12px;color:#59606b}
 #nodeColorStatus:empty{display:none}
 @media(max-width:768px){#colorBtn::after{content:"Color"}}
+
+svg.selecting,svg.selecting .node{cursor:crosshair}
+.node.selected .box{stroke:#2563eb;stroke-width:4;stroke-dasharray:7 4}
+#selectionRect{fill:rgba(37,99,235,.12);stroke:#2563eb;stroke-width:1.5;vector-effect:non-scaling-stroke}
+.node-color-panel small{width:100%;color:#59606b;line-height:1.4}
+.node-color-panel label{display:flex;align-items:center;gap:4px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}

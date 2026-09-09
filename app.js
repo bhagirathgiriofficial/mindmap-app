@@ -82,9 +82,12 @@ let dragging=false,dragStart=null;
 let editingId=null;
 let menuProjectId=null;
 let colorMode=false;
-let selectedColorNode=null;
+let selectedColorNodes=new Set();
+let selectionDrag=null;
+let suppressNodeClickUntil=0;
 const colorPanel=document.getElementById("nodeColorPanel");
 const colorInput=document.getElementById("nodeColorInput");
+const textInput=document.getElementById("nodeTextColorInput");
 const colorSave=document.getElementById("saveNodeColor");
 
 function uid(){
@@ -109,6 +112,7 @@ function sanitizeNode(node,depth=0,index=0){
     label:node.label.trim()
   };
   if(node.color)clean.color=node.color;
+  if(node.textColor)clean.textColor=node.textColor;
   if(Array.isArray(node.children))clean.children=node.children.map((c,i)=>sanitizeNode(c,depth+1,i));
   return clean;
 }
@@ -222,41 +226,109 @@ function textColor(fill){
   return .2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2]>.179?"#1b1d22":"#ffffff";
 }
 function setColorMode(enabled){
-  colorMode=enabled;selectedColorNode=null;
+  colorMode=enabled;selectedColorNodes.clear();
+  cancelSelection();
   colorPanel.hidden=!enabled;
+  svg.classList.toggle("selecting",enabled);
   document.getElementById("colorBtn").setAttribute("aria-pressed",String(enabled));
-  document.getElementById("nodeColorName").textContent="Click a node to change its color";
-  document.getElementById("nodeColorStatus").textContent="";
-  colorInput.disabled=true;colorSave.disabled=true;
+  updateColorSelection();
 }
-function selectColorNode(n){
-  selectedColorNode=n;
-  document.getElementById("nodeColorName").textContent=n.label;
+function updateColorSelection(){
+  const nodes=[...selectedColorNodes];
+  document.getElementById("nodeColorName").textContent=nodes.length===1?nodes[0].label:nodes.length?`${nodes.length} nodes selected`:"Drag across nodes or click a node to select";
   document.getElementById("nodeColorStatus").textContent="";
-  colorInput.value=nodeFill(n);
-  colorInput.disabled=false;colorSave.disabled=false;
-  colorInput.focus();
+  colorInput.disabled=textInput.disabled=colorSave.disabled=!nodes.length;
+  if(nodes.length){
+    colorInput.value=nodeFill(nodes[0]);
+    textInput.value=nodes[0].textColor||textColor(nodeFill(nodes[0]));
+  }
+  render();
+}
+function selectColorNode(n,additive=false){
+  if(!additive)selectedColorNodes.clear();
+  if(additive&&selectedColorNodes.has(n))selectedColorNodes.delete(n);
+  else selectedColorNodes.add(n);
+  updateColorSelection();
 }
 function saveNodeColor(){
-  const n=selectedColorNode,p=projects.find(p=>p.id===activeId);
-  if(!n||!p)return;
-  // Follow the tree path so even imported nodes with duplicate IDs stay distinct.
-  const path=[];
-  for(let child=n;child.parent;child=child.parent)path.unshift(child.parent.children.indexOf(child));
-  let saved=p.data;
-  for(const index of path)saved=saved.children[index];
-  const previous=saved.color,updatedAt=p.updatedAt;
-  saved.color=colorInput.value;p.updatedAt=Date.now();
-  try{persist()}catch(error){
-    if(previous===undefined)delete saved.color;else saved.color=previous;
-    p.updatedAt=updatedAt;
-    document.getElementById("nodeColorStatus").textContent="Could not save color. Browser storage may be full.";
+  const p=projects.find(p=>p.id===activeId);
+  if(!selectedColorNodes.size||!p)return;
+  const background=document.getElementById("applyBackground").checked;
+  const text=document.getElementById("applyText").checked;
+  if(!background&&!text){
+    document.getElementById("nodeColorStatus").textContent="Choose background, text, or both to apply.";
     return;
   }
-  n.color=colorInput.value;
+  const previous=deepCopy(p.data),updatedAt=p.updatedAt;
+  for(const n of selectedColorNodes){
+    const path=[];
+    for(let child=n;child.parent;child=child.parent)path.unshift(child.parent.children.indexOf(child));
+    let saved=p.data;
+    for(const index of path)saved=saved.children[index];
+    if(background)saved.color=colorInput.value;
+    if(text)saved.textColor=textInput.value;
+  }
+  p.updatedAt=Date.now();
+  try{persist()}catch(error){
+    p.data=previous;p.updatedAt=updatedAt;
+    document.getElementById("nodeColorStatus").textContent="Could not save colors. Browser storage may be full.";
+    return;
+  }
+  for(const n of selectedColorNodes){
+    if(background)n.color=colorInput.value;
+    if(text)n.textColor=textInput.value;
+  }
   indexTree(currentData);render();renderProjectList();
-  document.getElementById("nodeColorStatus").textContent="Color saved. JSON updated.";
+  document.getElementById("nodeColorStatus").textContent="Colors saved. JSON updated.";
 }
+function selectionPoint(e){
+  return new DOMPoint(e.clientX,e.clientY).matrixTransform(viewport.getScreenCTM().inverse());
+}
+function cancelSelection(){
+  if(selectionDrag){
+    try{svg.releasePointerCapture(selectionDrag.pointerId)}catch{}
+    selectionDrag=null;
+  }
+  document.getElementById("selectionRect").setAttribute("visibility","hidden");
+}
+// Capture selection gestures before individual cards consume pointer events.
+svg.addEventListener("pointerdown",e=>{
+  if(!colorMode||e.button!==0)return;
+  if(selectionDrag){cancelSelection();return}
+  const start=selectionPoint(e);
+  selectionDrag={start,clientX:e.clientX,clientY:e.clientY,pointerId:e.pointerId,base:e.shiftKey?new Set(selectedColorNodes):new Set(),moved:false};
+  svg.setPointerCapture(e.pointerId);
+},true);
+svg.addEventListener("pointermove",e=>{
+  const drag=selectionDrag;
+  if(!drag||e.pointerId!==drag.pointerId)return;
+  if(!drag.moved&&Math.hypot(e.clientX-drag.clientX,e.clientY-drag.clientY)<5)return;
+  drag.moved=true;
+  const point=selectionPoint(e),x=Math.min(point.x,drag.start.x),y=Math.min(point.y,drag.start.y);
+  const width=Math.abs(point.x-drag.start.x),height=Math.abs(point.y-drag.start.y);
+  selectedColorNodes=new Set(drag.base);
+  function visit(n){
+    if(n._x<=x+width&&n._x+n._w>=x&&n._y<=y+height&&n._y+n._h>=y)selectedColorNodes.add(n);
+    visibleChildren(n).forEach(visit);
+  }
+  if(currentData)visit(currentData);
+  updateColorSelection();
+  const rect=document.getElementById("selectionRect");
+  for(const [key,value] of Object.entries({x,y,width,height,visibility:"visible"}))rect.setAttribute(key,value);
+});
+svg.addEventListener("pointerup",e=>{
+  if(!selectionDrag||e.pointerId!==selectionDrag.pointerId)return;
+  if(selectionDrag.moved)suppressNodeClickUntil=Date.now()+350;
+  else{
+    // Pointer capture retargets clicks to the canvas, so hit-test the release.
+    const target=document.elementFromPoint(e.clientX,e.clientY)?.closest(".node");
+    if(target?.mapNode)selectColorNode(target.mapNode,e.shiftKey);
+    else if(!e.shiftKey){selectedColorNodes.clear();updateColorSelection()}
+    suppressNodeClickUntil=Date.now()+350;
+  }
+  cancelSelection();
+});
+svg.addEventListener("pointercancel",cancelSelection);
 function render(){
   if(!currentData)return;
   layout(currentData,0,0);clear(linksG);clear(nodesG);drawLinks(currentData);drawNodes(currentData);applyTransform();
@@ -273,7 +345,8 @@ function drawLinks(n){
 }
 function drawNodes(n){
   const g=document.createElementNS(NS,"g");
-  g.setAttribute("class",`node depth-${n.depth}${n.root?" root":""}`);
+  g.mapNode=n;
+  g.setAttribute("class",`node depth-${n.depth}${n.root?" root":""}${selectedColorNodes.has(n)?" selected":""}`);
   g.setAttribute("transform",`translate(${n._x},${n._y})`);
   const rect=document.createElementNS(NS,"rect");
   rect.setAttribute("class","box");rect.setAttribute("width",n._w);rect.setAttribute("height",n._h);
@@ -283,7 +356,7 @@ function drawNodes(n){
   g.appendChild(rect);
   const fo=document.createElementNS(NS,"foreignObject");
   fo.setAttribute("x","0");fo.setAttribute("y","0");fo.setAttribute("width",n._w);fo.setAttribute("height",n._h);
-  const div=document.createElement("div");div.setAttribute("xmlns","http://www.w3.org/1999/xhtml");div.className="label";div.textContent=n.label;div.style.color=textColor(fill);
+  const div=document.createElement("div");div.setAttribute("xmlns","http://www.w3.org/1999/xhtml");div.className="label";div.textContent=n.label;div.style.color=n.textColor||textColor(fill);
   fo.appendChild(div);g.appendChild(fo);
   if(n.children&&n.children.length){
     const cx=n._w+13,cy=n._h/2;
@@ -294,7 +367,7 @@ function drawNodes(n){
   }
   // Node interactions must win over canvas drag/pointer capture.
   g.addEventListener("pointerdown",e=>e.stopPropagation());
-  g.addEventListener("click",e=>{e.stopPropagation();if(colorMode){selectColorNode(n);return}if(n.children&&n.children.length){n.expanded=!n.expanded;render()}});
+  g.addEventListener("click",e=>{e.stopPropagation();if(Date.now()<suppressNodeClickUntil)return;if(colorMode){selectColorNode(n,e.shiftKey);return}if(n.children&&n.children.length){n.expanded=!n.expanded;render()}});
   nodesG.appendChild(g);visibleChildren(n).forEach(drawNodes);
 }
 function applyTransform(){
@@ -314,7 +387,7 @@ svg.addEventListener("wheel",e=>{
 },{passive:false});
 svg.addEventListener("pointerdown",e=>{
   // Start panning only from empty canvas space, never from a node/card.
-  if(e.button!==0 || e.target.closest?.(".node"))return;dragging=true;svg.classList.add("dragging");
+  if(colorMode || e.button!==0 || e.target.closest?.(".node"))return;dragging=true;svg.classList.add("dragging");
   dragStart={x:e.clientX,y:e.clientY,tx:transform.x,ty:transform.y};svg.setPointerCapture(e.pointerId);
 });
 svg.addEventListener("pointermove",e=>{
@@ -426,6 +499,7 @@ document.getElementById("fullBtn").onclick=async()=>{
 };
 window.addEventListener("resize",()=>setTimeout(fitView,80));
 document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"&&colorMode)setColorMode(false);
   if(e.key==="Escape"&&overlay.classList.contains("show"))closeModal();
 });
 
