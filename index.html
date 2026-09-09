@@ -38,8 +38,18 @@
       <button id="expandBtn">Expand All</button>
       <button id="collapseBtn">Collapse</button>
       <div class="divider"></div>
+      <button id="colorBtn" aria-pressed="false">Node Color</button>
       <button id="editBtn">Edit JSON</button>
       <button id="fullBtn" title="Fullscreen">⛶</button>
+    </div>
+
+    <div id="nodeColorPanel" class="node-color-panel" hidden>
+      <span id="nodeColorName">Click a node to change its color</span>
+      <label for="nodeColorInput">Color</label>
+      <input type="color" id="nodeColorInput" value="#6ea8fe" disabled>
+      <button id="saveNodeColor" disabled>Save color</button>
+      <button id="closeNodeColor">Done</button>
+      <span id="nodeColorStatus" role="status"></span>
     </div>
 
     <svg id="canvas" viewBox="0 0 1600 900" aria-label="Interactive mind map">

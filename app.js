@@ -81,6 +81,11 @@ let transform={x:80,y:70,k:1};
 let dragging=false,dragStart=null;
 let editingId=null;
 let menuProjectId=null;
+let colorMode=false;
+let selectedColorNode=null;
+const colorPanel=document.getElementById("nodeColorPanel");
+const colorInput=document.getElementById("nodeColorInput");
+const colorSave=document.getElementById("saveNodeColor");
 
 function uid(){
   return "p_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,7);
@@ -141,6 +146,7 @@ function selectProject(id){
   loadCurrentProject();
 }
 function loadCurrentProject(){
+  setColorMode(false);
   const p=projects.find(x=>x.id===activeId);
   if(!p){
     currentData=null;clear(linksG);clear(nodesG);empty.classList.add("show");return;
@@ -157,9 +163,9 @@ function indexTree(root){
   nodeState=new Map();
   function walk(n,parent=null,topColor=null,depth=0,idx=0){
     n.parent=parent;n.depth=depth;
-    if(depth===0){n.root=true;n.expanded=true;n.topColor="#22252a";}
+    if(depth===0){n.root=true;n.expanded=true;n.topColor=n.color||"#22252a";}
     else{
-      n.topColor=depth===1?(n.color||COLORS[idx%COLORS.length]):topColor;
+      n.topColor=n.color||(depth===1?COLORS[idx%COLORS.length]:topColor);
       if(n.expanded===undefined)n.expanded=false;
     }
     nodeState.set(n.id,n);
@@ -204,6 +210,53 @@ function shade(hex,amt){
   r=Math.max(0,Math.min(255,r));g=Math.max(0,Math.min(255,g));b=Math.max(0,Math.min(255,b));
   return "#"+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
 }
+function nodeFill(n){
+  return n.color||(n.root?"#22252a":n.depth===1?n.topColor:shade(n.topColor,62));
+}
+function textColor(fill){
+  if(!/^#[0-9a-f]{6}$/i.test(fill))return "#1b1d22";
+  const rgb=fill.slice(1).match(/../g).map(v=>{
+    const c=parseInt(v,16)/255;
+    return c<=.04045?c/12.92:Math.pow((c+.055)/1.055,2.4);
+  });
+  return .2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2]>.179?"#1b1d22":"#ffffff";
+}
+function setColorMode(enabled){
+  colorMode=enabled;selectedColorNode=null;
+  colorPanel.hidden=!enabled;
+  document.getElementById("colorBtn").setAttribute("aria-pressed",String(enabled));
+  document.getElementById("nodeColorName").textContent="Click a node to change its color";
+  document.getElementById("nodeColorStatus").textContent="";
+  colorInput.disabled=true;colorSave.disabled=true;
+}
+function selectColorNode(n){
+  selectedColorNode=n;
+  document.getElementById("nodeColorName").textContent=n.label;
+  document.getElementById("nodeColorStatus").textContent="";
+  colorInput.value=nodeFill(n);
+  colorInput.disabled=false;colorSave.disabled=false;
+  colorInput.focus();
+}
+function saveNodeColor(){
+  const n=selectedColorNode,p=projects.find(p=>p.id===activeId);
+  if(!n||!p)return;
+  // Follow the tree path so even imported nodes with duplicate IDs stay distinct.
+  const path=[];
+  for(let child=n;child.parent;child=child.parent)path.unshift(child.parent.children.indexOf(child));
+  let saved=p.data;
+  for(const index of path)saved=saved.children[index];
+  const previous=saved.color,updatedAt=p.updatedAt;
+  saved.color=colorInput.value;p.updatedAt=Date.now();
+  try{persist()}catch(error){
+    if(previous===undefined)delete saved.color;else saved.color=previous;
+    p.updatedAt=updatedAt;
+    document.getElementById("nodeColorStatus").textContent="Could not save color. Browser storage may be full.";
+    return;
+  }
+  n.color=colorInput.value;
+  indexTree(currentData);render();renderProjectList();
+  document.getElementById("nodeColorStatus").textContent="Color saved. JSON updated.";
+}
 function render(){
   if(!currentData)return;
   layout(currentData,0,0);clear(linksG);clear(nodesG);drawLinks(currentData);drawNodes(currentData);applyTransform();
@@ -224,15 +277,13 @@ function drawNodes(n){
   g.setAttribute("transform",`translate(${n._x},${n._y})`);
   const rect=document.createElementNS(NS,"rect");
   rect.setAttribute("class","box");rect.setAttribute("width",n._w);rect.setAttribute("height",n._h);
-  if(n.root){rect.setAttribute("fill","#22252a");rect.setAttribute("stroke","#22252a")}
-  else{
-    const fill=n.depth===1?n.topColor:shade(n.topColor,62);
-    rect.setAttribute("fill",fill);rect.setAttribute("stroke",n.depth===1?shade(n.topColor,-18):shade(n.topColor,12));
-  }
+  const fill=nodeFill(n);
+  rect.setAttribute("fill",fill);
+  rect.setAttribute("stroke",shade(fill,-18));
   g.appendChild(rect);
   const fo=document.createElementNS(NS,"foreignObject");
   fo.setAttribute("x","0");fo.setAttribute("y","0");fo.setAttribute("width",n._w);fo.setAttribute("height",n._h);
-  const div=document.createElement("div");div.setAttribute("xmlns","http://www.w3.org/1999/xhtml");div.className="label";div.textContent=n.label;
+  const div=document.createElement("div");div.setAttribute("xmlns","http://www.w3.org/1999/xhtml");div.className="label";div.textContent=n.label;div.style.color=textColor(fill);
   fo.appendChild(div);g.appendChild(fo);
   if(n.children&&n.children.length){
     const cx=n._w+13,cy=n._h/2;
@@ -243,7 +294,7 @@ function drawNodes(n){
   }
   // Node interactions must win over canvas drag/pointer capture.
   g.addEventListener("pointerdown",e=>e.stopPropagation());
-  g.addEventListener("click",e=>{e.stopPropagation();if(n.children&&n.children.length){n.expanded=!n.expanded;render()}});
+  g.addEventListener("click",e=>{e.stopPropagation();if(colorMode){selectColorNode(n);return}if(n.children&&n.children.length){n.expanded=!n.expanded;render()}});
   nodesG.appendChild(g);visibleChildren(n).forEach(drawNodes);
 }
 function applyTransform(){
@@ -347,6 +398,9 @@ document.getElementById("menuDelete").onclick=()=>{
 };
 
 /* Controls */
+document.getElementById("colorBtn").onclick=()=>setColorMode(!colorMode);
+document.getElementById("closeNodeColor").onclick=()=>setColorMode(false);
+colorSave.onclick=saveNodeColor;
 document.getElementById("newProject").onclick=()=>openModal("new");
 document.getElementById("emptyCreate").onclick=()=>openModal("new");
 document.getElementById("editBtn").onclick=()=>{if(activeId)openModal("edit",activeId)};

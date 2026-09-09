@@ -161,3 +161,15 @@ textarea{height:390px;resize:vertical;font-family:"SFMono-Regular",Consolas,"Lib
   .modal{max-height:98dvh}
   textarea{height:42dvh;min-height:160px}
 }
+
+.toolbar button[aria-pressed="true"]{background:#22252a;color:white}
+.node-color-panel{position:absolute;top:80px;right:16px;z-index:11;display:flex;flex-wrap:wrap;align-items:center;gap:10px;width:min(340px,calc(100% - 32px));padding:14px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);font-size:13px}
+.node-color-panel[hidden]{display:none}
+#nodeColorName{width:100%;font-weight:750;overflow-wrap:anywhere}
+#nodeColorInput{width:48px;height:40px;padding:2px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer}
+.node-color-panel button{min-height:40px;border:0;border-radius:8px;padding:8px 12px;cursor:pointer}
+#saveNodeColor{background:#22252a;color:#fff}
+.node-color-panel button:disabled{opacity:.45;cursor:default}
+#nodeColorStatus{width:100%;font-size:12px;color:#59606b}
+#nodeColorStatus:empty{display:none}
+@media(max-width:768px){#colorBtn::after{content:"Color"}}

@@ -85,8 +85,17 @@ You may also wrap the map in a project object:
 Each node supports:
 
 - `label` — required text shown in the node
-- `color` — optional hex color; most useful on top-level branches
+- `color` — optional hex color for any node. Nodes without a color inherit their branch color.
 - `children` — optional array of child nodes
+
+## Change node colors
+
+1. Click **Node Color** (or **Color** on mobile).
+2. Click any node, including the root or a nested item.
+3. Choose a color and click **Save color**.
+4. Click **Done** to return to expanding and collapsing nodes.
+
+The chosen color is saved in that node’s `color` property and is immediately available in **Edit JSON**. Colors persist after refreshing. Descendants without their own color follow their branch color with a lighter fill; explicitly colored descendants keep their chosen colors.
 
 ## Storage
 
