@@ -349,10 +349,11 @@ function cancelSelection(){
 }
 // Capture selection gestures before individual cards consume pointer events.
 svg.addEventListener("pointerdown",e=>{
-  if(!colorMode||e.button!==0)return;
+  if(e.button!==0||(!colorMode&&!e.shiftKey)||!currentData)return;
+  if(!colorMode)setColorMode(true);
   if(selectionDrag){cancelSelection();return}
   const start=selectionPoint(e);
-  selectionDrag={start,clientX:e.clientX,clientY:e.clientY,pointerId:e.pointerId,base:e.shiftKey?new Set(selectedColorNodes):new Set(),moved:false};
+  selectionDrag={start,clientX:e.clientX,clientY:e.clientY,pointerId:e.pointerId,additive:e.shiftKey,base:e.shiftKey?new Set(selectedColorNodes):new Set(),moved:false};
   svg.setPointerCapture(e.pointerId);
 },true);
 svg.addEventListener("pointermove",e=>{
@@ -378,8 +379,8 @@ svg.addEventListener("pointerup",e=>{
   else{
     // Pointer capture retargets clicks to the canvas, so hit-test the release.
     const target=document.elementFromPoint(e.clientX,e.clientY)?.closest(".node");
-    if(target?.mapNode)selectColorNode(target.mapNode,e.shiftKey);
-    else if(!e.shiftKey){selectedColorNodes.clear();updateColorSelection()}
+    if(target?.mapNode)selectColorNode(target.mapNode,selectionDrag.additive);
+    else if(!selectionDrag.additive){selectedColorNodes.clear();updateColorSelection()}
     suppressNodeClickUntil=Date.now()+350;
   }
   cancelSelection();

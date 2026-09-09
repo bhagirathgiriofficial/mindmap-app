@@ -91,7 +91,7 @@ Each node supports:
 
 ## Select nodes and change colors
 
-1. Click **Select & Color** (or **Color** on mobile).
+1. Click **Select & Color** (or **Color** on mobile), or hold **Shift** and click/drag directly on the canvas to enter selection mode. The color controls stay open after releasing Shift; click **Done** or press **Escape** to return to panning.
 2. Drag a rectangle across nodes to select them, or click a single node. Shift-click adds or removes nodes; Shift-drag adds a group. **Ctrl+A** (Windows/Linux) or **Cmd+A** (Mac) selects all visible nodes and opens color mode. The shortcut keeps its normal text-selection behavior in input fields and the JSON editor.
 3. Choose **Background** and **Text** colors. Uncheck either option to preserve that property on selected nodes. With mixed colors, the pickers show the first selected node's values.
 4. Click **Apply colors**, then **Done** to return to panning and expanding nodes. Escape also exits selection mode.
