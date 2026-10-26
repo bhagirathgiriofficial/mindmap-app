@@ -1,18 +1,20 @@
-import {forwardRef,useEffect,useImperativeHandle,useMemo,useRef,useState} from "react";
+import {forwardRef,useEffect,useImperativeHandle,useLayoutEffect,useMemo,useRef,useState} from "react";
 import {buildLinks,nodeStyle} from "../lib/layout.js";
 import {useTweenedNodes} from "../hooks/animation.js";
 import {contrastText} from "../lib/tree.js";
 
 const PINCH_MIN=.18,PINCH_MAX=3.2;
 const TOGGLE_R=10;
+const DOUBLE_CLICK_MS=220,LONG_PRESS_MS=520;
 
 /*
  * SVG canvas: renders the laid-out map and owns pointer gestures
- * (pan, wheel zoom, pinch zoom and rectangle selection).
+ * (pan, wheel zoom, pinch zoom and rectangle selection), plus inline label editing.
  */
 const MindMapCanvas=forwardRef(function MindMapCanvas({
   layout,mode,transform,setTransform,transformRef,zoomAt,
-  colorMode,selected,onEnterColorMode,onSelectionChange,onSelectNode,onToggleNode
+  colorMode,selected,onEnterColorMode,onSelectionChange,onSelectNode,onToggleNode,
+  editingId,onStartEdit,onCommitEdit,onCancelEdit,onNodeMenu
 },ref){
   const svgRef=useRef(null);
   const viewportRef=useRef(null);
@@ -21,6 +23,8 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
   const suppressClickUntil=useRef(0);
   const [selectionRect,setSelectionRect]=useState(null);
   const [panning,setPanning]=useState(false);
+  const clickTimer=useRef(0);
+  const longPress=useRef(null);
 
   const nodes=useTweenedNodes(layout.nodes);
   const links=useMemo(()=>buildLinks(nodes),[nodes]);
@@ -161,13 +165,56 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
     e.stopPropagation();
     if(Date.now()<suppressClickUntil.current)return;
     if(colorMode){onSelectNode(n.id,e.shiftKey);return}
-    if(n.hasChildren)onToggleNode(n.id);
+    // Wait briefly so a double-click can edit the label instead of toggling.
+    clearTimeout(clickTimer.current);
+    if(n.hasChildren&&e.detail<2)clickTimer.current=setTimeout(()=>onToggleNode(n.id),DOUBLE_CLICK_MS);
   }
+
+  function handleToggleClick(e,n){
+    e.stopPropagation();
+    if(Date.now()<suppressClickUntil.current||colorMode)return;
+    clearTimeout(clickTimer.current);
+    onToggleNode(n.id);
+  }
+
+  function handleDoubleClick(e,n){
+    e.stopPropagation();
+    clearTimeout(clickTimer.current);
+    if(!colorMode)onStartEdit(n.id);
+  }
+
+  function handleContextMenu(e,n){
+    e.preventDefault();e.stopPropagation();
+    clearTimeout(clickTimer.current);
+    onNodeMenu(n.id,e.clientX,e.clientY);
+  }
+
+  // Touch has no right-click, so a long press opens the node menu.
+  function handleNodePointerDown(e,n){
+    e.stopPropagation();
+    clearTimeout(longPress.current?.timer);
+    if(e.pointerType!=="touch")return;
+    const {clientX:x,clientY:y}=e;
+    longPress.current={x,y,timer:setTimeout(()=>{
+      suppressClickUntil.current=Date.now()+600;
+      onNodeMenu(n.id,x,y);
+    },LONG_PRESS_MS)};
+  }
+  function cancelLongPress(e){
+    const lp=longPress.current;
+    if(lp&&(!e||e.type!=="pointermove"||Math.hypot(e.clientX-lp.x,e.clientY-lp.y)>8)){
+      clearTimeout(lp.timer);longPress.current=null;
+    }
+  }
+  useEffect(()=>()=>{clearTimeout(clickTimer.current);clearTimeout(longPress.current?.timer)},[]);
 
   // Grid spacing follows zoom so the dots feel attached to the canvas.
   const grid=24*transform.k;
 
+  const editingNode=editingId&&layout.nodes.find(n=>n.id===editingId);
+
   return(
+    <>
     <svg id="canvas" ref={svgRef} className={colorMode?"selecting":panning?"dragging":""} aria-label="Interactive mind map"
       onPointerDownCapture={handlePointerDownCapture}
       onPointerDown={handlePointerDown}
@@ -186,15 +233,58 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
           {links.map(l=><path key={l.id} className="branch" d={l.d} fill={l.color} opacity={l.opacity*.9}/>)}
         </g>
         <g className="nodes">
-          {nodes.map(n=><MapNode key={n.id} n={n} mode={mode} selected={selected.has(n.id)} onClick={handleNodeClick}/>)}
+          {nodes.map(n=><MapNode key={n.id} n={n} mode={mode} selected={selected.has(n.id)} editing={n.id===editingId}
+            handlers={{handleNodeClick,handleToggleClick,handleDoubleClick,handleContextMenu,handleNodePointerDown,cancelLongPress}}/>)}
         </g>
         {selectionRect&&<rect className="selection-rect" {...selectionRect} pointerEvents="none"/>}
       </g>
     </svg>
+    {editingNode&&<NodeEditor key={editingNode.id} node={editingNode} transform={transform}
+      onCommit={label=>onCommitEdit(editingNode.id,label)} onCancel={onCancelEdit}/>}
+    </>
   );
 });
 
-function MapNode({n,mode,selected,onClick}){
+// Text box laid over the node being renamed; follows pan and zoom.
+function NodeEditor({node,transform,onCommit,onCancel}){
+  const ref=useRef(null);
+  const done=useRef(false);
+  const [value,setValue]=useState(node.label);
+  const style=nodeStyle(node.depth),k=transform.k;
+
+  // preventScroll: focusing a box that pokes past the edge must not scroll the workspace.
+  useLayoutEffect(()=>{ref.current.focus({preventScroll:true});ref.current.select()},[]);
+  useLayoutEffect(()=>{
+    const el=ref.current;
+    el.style.height="auto";
+    el.style.height=Math.max(node.h*k,el.scrollHeight)+"px";
+  },[value,k,node.h]);
+
+  const finish=save=>{
+    if(done.current)return;
+    done.current=true;
+    save?onCommit(value):onCancel();
+  };
+
+  return(
+    <textarea ref={ref} className="node-editor" value={value} rows={1} spellCheck={false}
+      aria-label="Node text"
+      onChange={e=>setValue(e.target.value.replace(/\n/g," "))}
+      onKeyDown={e=>{
+        if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();finish(true)}
+        else if(e.key==="Escape"){e.preventDefault();e.stopPropagation();finish(false)}
+      }}
+      onBlur={()=>finish(true)}
+      style={{
+        left:node.x*k+transform.x,top:node.y*k+transform.y,width:Math.max(node.w,160)*k,
+        fontSize:style.size*k,fontWeight:style.weight,lineHeight:`${style.line*k}px`,
+        padding:`${style.py*k}px ${style.px*k}px`,borderRadius:Math.min(style.radius,node.h/2)*k,
+        background:node.fill,color:node.text
+      }}/>
+  );
+}
+
+function MapNode({n,mode,selected,editing,handlers:h}){
   const style=nodeStyle(n.depth);
   const radius=Math.min(style.radius,n.h/2);
   // The root's toggle only appears when it would not sit on top of a branch.
@@ -203,20 +293,23 @@ function MapNode({n,mode,selected,onClick}){
   return(
     <g className={`node depth-${Math.min(n.depth,2)}${n.root?" root":""}${selected?" selected":""}`}
       transform={`translate(${n.x},${n.y})`} opacity={n.opacity??1}
-      onPointerDown={e=>e.stopPropagation()}
-      onClick={e=>onClick(e,n)}>
+      onPointerDown={e=>h.handleNodePointerDown(e,n)}
+      onPointerMove={h.cancelLongPress} onPointerUp={h.cancelLongPress} onPointerCancel={h.cancelLongPress}
+      onClick={e=>h.handleNodeClick(e,n)} onDoubleClick={e=>h.handleDoubleClick(e,n)}
+      onContextMenu={e=>h.handleContextMenu(e,n)}>
       <g className="node-body">
         {selected&&<rect className="select-ring" x={-5} y={-5} width={n.w+10} height={n.h+10} rx={radius+5}/>}
         <rect className="box" width={n.w} height={n.h} rx={radius} fill={n.fill} stroke={n.border}/>
         <foreignObject width={n.w} height={n.h}>
-          <div className="label" style={{
+          <div className="label" style={{visibility:editing?"hidden":undefined,
             color:n.text,fontSize:style.size,fontWeight:style.weight,lineHeight:`${style.line}px`,
             padding:`${style.py}px ${style.px}px`
           }}>{n.label}</div>
         </foreignObject>
       </g>
       {showToggle&&(
-        <g className={"toggle"+(n.expanded?"":" collapsed")} transform={`translate(${tx},${ty})`}>
+        <g className={"toggle"+(n.expanded?"":" collapsed")} transform={`translate(${tx},${ty})`}
+          onClick={e=>h.handleToggleClick(e,n)} onDoubleClick={e=>e.stopPropagation()}>
           <title>{n.expanded?"Collapse":`Expand ${n.childCount} item${n.childCount===1?"":"s"}`}</title>
           <circle r={TOGGLE_R} fill={n.expanded?"var(--surface)":n.topColor} stroke={n.topColor}/>
           {n.expanded

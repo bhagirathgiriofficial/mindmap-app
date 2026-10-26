@@ -1,5 +1,5 @@
 import {useEffect,useRef} from "react";
-import {X,Ban,Check,Pipette} from "lucide-react";
+import {X,Ban,Check,Pipette,Pencil,Trash2} from "lucide-react";
 import {FILL_SWATCHES,TEXT_SWATCHES} from "../lib/constants.js";
 import {contrastText} from "../lib/tree.js";
 
@@ -39,7 +39,7 @@ function SwatchRow({title,swatches,current,fallback,onPick}){
   );
 }
 
-export default function ColorPanel({count,title,current,fallback,onApply,onClose}){
+export default function ColorPanel({count,title,current,fallback,onApply,onEdit,onDelete,canDelete,onClose}){
   return(
     <div className="color-panel glass" role="dialog" aria-label="Node colors">
       <div className="color-head">
@@ -54,6 +54,14 @@ export default function ColorPanel({count,title,current,fallback,onApply,onClose
           onPick={c=>onApply({color:c})}/>
         <SwatchRow title="Text" swatches={TEXT_SWATCHES} current={current.text} fallback={fallback.text}
           onPick={c=>onApply({textColor:c})}/>
+        <div className="panel-actions">
+          <button className="secondary-btn" onClick={onEdit} disabled={count!==1} data-tip={count===1?"Edit text · Enter":"Select one node to edit"}>
+            <Pencil size={15}/>Edit text
+          </button>
+          <button className="secondary-btn danger" onClick={onDelete} disabled={!canDelete} data-tip={canDelete?"Delete · Del":"The central topic can't be deleted"}>
+            <Trash2 size={15}/>Delete
+          </button>
+        </div>
       </div>
     </div>
   );

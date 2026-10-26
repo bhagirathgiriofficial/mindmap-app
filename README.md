@@ -11,6 +11,7 @@ A lightweight, offline-first interactive mind-map presentation app built with Re
 - Keyboard shortcuts (press **?** to see them all)
 - Paste JSON to create a new mind map, with live validation and a Format button
 - Multiple maps stored in browser `localStorage`, with search, duplicate, and delete
+- Edit node text in place and delete nodes (with undo)
 - Click-to-color styling with preset swatches and a custom picker
 - 10-step undo per map
 - Touch-friendly: pinch to zoom, bottom dock and sheets on phones
@@ -95,6 +96,15 @@ Each node supports:
 - `textColor` — optional hex text color; otherwise automatic contrast is used
 - `children` — optional array of child nodes
 
+## Edit and delete nodes
+
+- **Edit text:** double-click a node, type, then press **Enter** (or click away) to save. **Escape** cancels. Empty text is not allowed.
+- **Node menu:** right-click a node (long-press on touch screens) for **Edit text**, **Color…** and **Delete**.
+- **Delete:** removes the node and everything below it. The central topic can't be deleted. A message with an **Undo** button appears after each delete.
+- **In selection mode:** with nodes selected, press **Delete** / **Backspace** to delete them, or **Enter** / **F2** to edit a single selected node. The style panel has the same **Edit text** and **Delete** buttons.
+
+Edits and deletes save immediately, update the map's JSON, and each counts as one undo step.
+
 ## Select nodes and change colors
 
 1. Click the palette button in the bottom dock, or hold **Shift** and click/drag on the canvas, to enter selection mode.
@@ -106,7 +116,7 @@ Fill colors save as `color` and text colors as `textColor` in the node's JSON; c
 
 ## Undo
 
-Click **Undo** in the dock or press **Ctrl+Z / Cmd+Z** to undo up to 10 color changes or saved JSON edits per map. A color change applied to many nodes counts as one step. Undo restores the saved JSON as well as the map. Histories remain available when switching projects during the current session and reset on page reload. Text fields and the JSON editor retain their native text undo.
+Click **Undo** in the dock or press **Ctrl+Z / Cmd+Z** to undo up to 10 color changes, text edits, deletes or saved JSON edits per map. A color change applied to many nodes counts as one step. Undo restores the saved JSON as well as the map. Histories remain available when switching projects during the current session and reset on page reload. Text fields and the JSON editor retain their native text undo.
 
 ## Storage
 
@@ -123,7 +133,10 @@ This means:
 
 | Action | Mouse / touch | Keyboard |
 | --- | --- | --- |
-| Open / close a branch | Click a node | |
+| Open / close a branch | Click a node or its badge | |
+| Edit node text | Double-click a node | **Enter** (selected node) |
+| Node menu | Right-click / long-press a node | |
+| Delete nodes | Node menu | **Delete** (selected nodes) |
 | Pan | Drag the canvas, two-finger scroll | |
 | Zoom | Ctrl/Cmd + scroll, pinch, **+ / −** buttons | **+** / **−** |
 | Fit view | Zoom percentage or fit button | **F** |

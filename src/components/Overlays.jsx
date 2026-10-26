@@ -17,6 +17,12 @@ const SHORTCUTS=[
     ["Collapse all",["C"]],
     ["Undo",[MOD,"Z"]]
   ]],
+  ["Edit",[
+    ["Edit node text","Double-click"],
+    ["Node menu","Right-click · long-press"],
+    ["Edit selected node",["Enter"]],
+    ["Delete selected nodes",["Del"]]
+  ]],
   ["Select & color",[
     ["Select nodes","Shift + drag"],
     ["Add / remove a node","Shift + click"],
@@ -78,8 +84,11 @@ export function EmptyState({onCreate,onExample}){
   );
 }
 
-export function Toast({message}){
+export function Toast({message,action}){
   return(
-    <div className={"toast"+(message?" show":"")} role="status" aria-live="polite">{message}</div>
+    <div className={"toast"+(message?" show":"")} role="status" aria-live="polite">
+      <span>{message}</span>
+      {message&&action&&<button onClick={action.onClick}>{action.label}</button>}
+    </div>
   );
 }

@@ -107,3 +107,27 @@ export function patchNodes(root,ids,patch){
     return next;
   })(root);
 }
+
+// Returns a new tree without the nodes in `ids` (and their subtrees).
+// A parent left with no children loses its `children` key so it renders as a leaf.
+export function removeNodes(root,ids){
+  return (function walk(n){
+    const next={...n};
+    if(n.children){
+      const kept=n.children.filter(c=>!ids.has(c.id)).map(walk);
+      if(kept.length)next.children=kept; else delete next.children;
+    }
+    return next;
+  })(root);
+}
+
+// Number of nodes that deleting `ids` removes, counting each subtree once.
+export function countRemoved(root,ids){
+  let total=0;
+  (function walk(n){
+    for(const c of n.children||[]){
+      if(ids.has(c.id))total+=countNodes(c); else walk(c);
+    }
+  })(root);
+  return total;
+}
