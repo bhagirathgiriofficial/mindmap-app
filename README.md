@@ -1,42 +1,48 @@
 # MindMap Studio
 
-A lightweight, offline-first interactive mind-map presentation app built with plain HTML, CSS, and JavaScript.
+A lightweight, offline-first interactive mind-map presentation app built with React and Vite.
 
 ## Features
 
-- Paste JSON to create a new mind-map project
-- Multiple projects stored in browser `localStorage`
-- Project switching from the sidebar
-- Edit, duplicate, and delete saved projects
-- Expand/collapse individual nodes
-- Expand All / Collapse controls
-- Drag canvas to pan
-- Two-finger trackpad scroll to pan
-- `Ctrl` / `Cmd` + scroll to zoom
-- Zoom in/out buttons
-- Fit View
-- Fullscreen presentation mode
-- Hideable sidebar
-- No framework, backend, database, or internet connection required
+- Modern canvas: measured, auto-sized nodes, tapered branches, and a dot grid that moves with the map
+- **Balanced** (branches on both sides) or **Right** layout
+- Smooth animations when expanding, collapsing, and fitting the view
+- Light and dark themes (follows your system on first visit)
+- Keyboard shortcuts (press **?** to see them all)
+- Paste JSON to create a new mind map, with live validation and a Format button
+- Multiple maps stored in browser `localStorage`, with search, duplicate, and delete
+- Click-to-color styling with preset swatches and a custom picker
+- 10-step undo per map
+- Touch-friendly: pinch to zoom, bottom dock and sheets on phones
+- No backend, database, or internet connection required at runtime
 
 ## Files
 
-- `index.html` — app structure
-- `styles.css` — all UI and mind-map styling
-- `app.js` — project management, localStorage, layout, pan/zoom, and rendering logic
+- `index.html` — Vite entry page
+- `src/main.jsx` — React entry point
+- `src/App.jsx` — app state: projects, expansion, pan/zoom, selection, undo
+- `src/components/` — `Sidebar`, `Toolbar`, `MindMapCanvas` (SVG rendering and gestures), `ColorPanel`, `ProjectModal`, `ProjectMenu`
+- `src/lib/` — tree helpers, layout, `localStorage` persistence, and constants
+- `src/styles.css` — all UI and mind-map styling
 
 ## Run locally
 
-You can simply open `index.html` in a modern browser.
+Requires Node.js 18+.
 
-For the most consistent local-development experience, you can also serve the folder with any simple static server.
+```bash
+npm install
+npm run dev
+```
 
-Example with VS Code Live Server:
+Then open the URL Vite prints (usually http://localhost:5173).
 
-1. Open the folder in VS Code.
-2. Install the **Live Server** extension.
-3. Right-click `index.html`.
-4. Choose **Open with Live Server**.
+To build a static version for hosting:
+
+```bash
+npm run build
+```
+
+The `dist/` folder can be served from any static host. It uses relative paths, so it also works from a subfolder. Opening `dist/index.html` directly from disk (`file://`) is not supported because browsers block module scripts there; use `npm run preview` or any static server instead.
 
 ## JSON format
 
@@ -91,16 +97,16 @@ Each node supports:
 
 ## Select nodes and change colors
 
-1. Click **Select & Color** (or **Color** on mobile), or hold **Shift** and click/drag directly on the canvas to enter selection mode. The color controls stay open after releasing Shift; click **Done** or press **Escape** to return to panning.
-2. Drag a rectangle across nodes to select them, or click a single node. Shift-click adds or removes nodes; Shift-drag adds a group. **Ctrl+A** (Windows/Linux) or **Cmd+A** (Mac) selects all visible nodes and opens color mode. The shortcut keeps its normal text-selection behavior in input fields and the JSON editor.
-3. Choose **Background** and **Text** colors. Uncheck either option to preserve that property on selected nodes. With mixed colors, the pickers show the first selected node's values.
-4. Click **Apply colors**, then **Done** to return to panning and expanding nodes. Escape also exits selection mode.
+1. Click the palette button in the bottom dock, or hold **Shift** and click/drag on the canvas, to enter selection mode.
+2. Drag a rectangle across nodes, or click a single node. Shift-click adds or removes nodes; Shift-drag adds a group. **Ctrl+A** / **Cmd+A** selects every visible node.
+3. In the style panel, pick a **Fill** or **Text** swatch. The change saves immediately and counts as one undo step. Use the pipette swatch for a custom color, or the crossed-out swatch to go back to the automatic color.
+4. Press **Escape** or the close button to return to panning.
 
-Only visible nodes intersecting the selection rectangle are selected. Background colors save as `color`, and text colors save as `textColor` in each selected node's JSON. Changes appear in **Edit JSON** and persist after refreshing. Descendants without an explicit background color follow their branch color with a lighter fill; explicitly colored descendants keep their chosen colors. Text uses automatic contrast unless `textColor` is set.
+Fill colors save as `color` and text colors as `textColor` in the node's JSON; choosing automatic removes the property. Nodes without an explicit fill follow their branch color (with a lighter tint below the first level), and text uses automatic contrast unless `textColor` is set.
 
 ## Undo
 
-Click **Undo** or press **Ctrl+Z / Cmd+Z** to undo up to 10 color applications or saved JSON edits per project. A bulk color application counts as one step. Undo restores the saved JSON as well as the map. Histories remain available when switching projects during the current session and reset on page reload. Text fields and the JSON editor retain their native text undo.
+Click **Undo** in the dock or press **Ctrl+Z / Cmd+Z** to undo up to 10 color changes or saved JSON edits per map. A color change applied to many nodes counts as one step. Undo restores the saved JSON as well as the map. Histories remain available when switching projects during the current session and reset on page reload. Text fields and the JSON editor retain their native text undo.
 
 ## Storage
 
@@ -115,21 +121,25 @@ This means:
 
 ## Presentation controls
 
-- **Click node:** expand/collapse
-- **Drag canvas:** pan
-- **Two-finger scroll:** pan
-- **Ctrl/Cmd + scroll:** zoom
-- **+ / −:** zoom
-- **Fit View:** automatically fit visible nodes
-- **Expand All:** reveal the full tree
-- **Collapse:** return to the top-level roadmap
-- **Fullscreen:** presentation mode
+| Action | Mouse / touch | Keyboard |
+| --- | --- | --- |
+| Open / close a branch | Click a node | |
+| Pan | Drag the canvas, two-finger scroll | |
+| Zoom | Ctrl/Cmd + scroll, pinch, **+ / −** buttons | **+** / **−** |
+| Fit view | Zoom percentage or fit button | **F** |
+| Expand all / collapse all | Dock buttons | **E** / **C** |
+| Undo | Dock button | **Ctrl/Cmd+Z** |
+| Shortcuts list | Keyboard button | **?** |
+| Fullscreen | Top-right button | |
+
+Layout (balanced or right) and theme (light or dark) are in the top-right bar and are remembered in this browser.
 
 ## Tech
 
-- HTML5
+- React 18
+- Vite
+- [Lucide](https://lucide.dev) icons and the Inter font, bundled for offline use
 - CSS3
-- Vanilla JavaScript
 - SVG for nodes and connectors
 - `localStorage` for persistence
 
