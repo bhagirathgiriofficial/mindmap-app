@@ -5,10 +5,11 @@ import ColorPanel from "./components/ColorPanel.jsx";
 import MindMapCanvas from "./components/MindMapCanvas.jsx";
 import ProjectModal from "./components/ProjectModal.jsx";
 import ProjectMenu from "./components/ProjectMenu.jsx";
+import NodeMenu from "./components/NodeMenu.jsx";
 import {HelpDialog,EmptyState,Toast} from "./components/Overlays.jsx";
 import {EXAMPLE,LAYOUT_KEY,THEME_KEY,UNDO_LIMIT} from "./lib/constants.js";
 import {bootstrap,persist} from "./lib/storage.js";
-import {buildStyleMap,countNodes,deepCopy,expandableIds,indexById,normalizePayload,patchNodes,sanitizeNode,uid} from "./lib/tree.js";
+import {buildStyleMap,countNodes,countRemoved,deepCopy,expandableIds,indexById,normalizePayload,patchNodes,removeNodes,sanitizeNode,uid} from "./lib/tree.js";
 import {layoutTree} from "./lib/layout.js";
 import {useViewTransform} from "./hooks/animation.js";
 
@@ -35,7 +36,9 @@ export default function App(){
   const [modal,setModal]=useState(null);
   const [menu,setMenu]=useState(null);
   const [help,setHelp]=useState(false);
-  const [toast,setToast]=useState("");
+  const [toast,setToast]=useState({message:""});
+  const [editingId,setEditingId]=useState(null);
+  const [nodeMenu,setNodeMenu]=useState(null);
   const [sidebarCollapsed,setSidebarCollapsed]=useState(mobileQuery.matches);
   const [isMobile,setIsMobile]=useState(mobileQuery.matches);
   const [theme,setTheme]=useState(initialTheme);
@@ -65,10 +68,10 @@ export default function App(){
   useEffect(()=>{document.fonts?.ready.then(()=>setFontsReady(true))},[]);
   useEffect(()=>{document.documentElement.dataset.theme=theme},[theme]);
 
-  function showToast(message){
+  function showToast(message,action=null){
     clearTimeout(toastTimer.current);
-    setToast(message);
-    toastTimer.current=setTimeout(()=>setToast(""),2200);
+    setToast({message,action});
+    toastTimer.current=setTimeout(()=>setToast({message:""}),action?5000:2200);
   }
 
   /* Persistence */
@@ -150,13 +153,47 @@ export default function App(){
     };
   },[selected,nodeIndex,styles]);
 
+  // Saves a new tree for the active map as one undo step. Returns false when nothing was saved.
+  function saveData(nextData,failMessage){
+    if(!active||JSON.stringify(nextData)===JSON.stringify(active.data))return false;
+    const next=projects.map(p=>p.id===active.id?{...p,data:nextData,updatedAt:Date.now()}:p);
+    if(!commit(next)){showToast(failMessage||"Could not save — browser storage may be full");return false}
+    recordUndo(active.id,{name:active.name,data:active.data});
+    return true;
+  }
+
   function applyStyle(patch){
     if(!selected.size||!active)return;
-    const nextData=patchNodes(active.data,selected,patch);
-    if(JSON.stringify(nextData)===JSON.stringify(active.data))return;
-    const next=projects.map(p=>p.id===active.id?{...p,data:nextData,updatedAt:Date.now()}:p);
-    if(!commit(next)){showToast("Could not save colors — browser storage may be full");return}
-    recordUndo(active.id,{name:active.name,data:active.data});
+    saveData(patchNodes(active.data,selected,patch),"Could not save colors — browser storage may be full");
+  }
+
+  /* Edit and delete nodes */
+  function startEdit(id){
+    if(!nodeIndex.has(id))return;
+    setNodeMenu(null);
+    // The node must be visible to edit it in place.
+    if(!layout.nodes.some(n=>n.id===id))return;
+    setEditingId(id);
+  }
+
+  function commitEdit(id,raw){
+    setEditingId(null);
+    const label=raw.replace(/\s+/g," ").trim();
+    if(!label){showToast("A node needs some text — kept the old label");return}
+    if(active&&label!==nodeIndex.get(id)?.label)saveData(patchNodes(active.data,new Set([id]),{label}));
+  }
+
+  function deleteNodes(ids){
+    if(!active)return;
+    const targets=new Set([...ids].filter(id=>id!==active.data.id&&nodeIndex.has(id)));
+    if(!targets.size){showToast("The central topic can't be deleted");return}
+    const removed=countRemoved(active.data,targets);
+    setNodeMenu(null);setEditingId(null);
+    canvasRef.current?.cancelSelection();
+    setSelected(new Set());
+    if(saveData(removeNodes(active.data,targets))){
+      showToast(`Deleted ${removed} node${removed===1?"":"s"}`,{label:"Undo",onClick:()=>keys.current.undoLastEdit()});
+    }
   }
 
   function undoLastEdit(){
@@ -174,6 +211,7 @@ export default function App(){
 
   /* Projects */
   function showProject(project){
+    setEditingId(null);setNodeMenu(null);
     setExpanded(new Set(project?[project.data.id]:[]));
     setColorMode(false);
     requestFit();
@@ -244,6 +282,7 @@ export default function App(){
 
   const closeMenu=useCallback(()=>setMenu(null),[]);
   const closeHelp=useCallback(()=>setHelp(false),[]);
+  const closeNodeMenu=useCallback(()=>setNodeMenu(null),[]);
 
   /* Expand / collapse */
   function toggleNode(id){
@@ -308,8 +347,8 @@ export default function App(){
 
   // Keyboard shortcuts read the latest handlers through a ref.
   const keys=useRef(null);
-  keys.current={undoLastEdit,selectAllVisible,setColorMode,expandAll,collapseToRoot,fitView,zoomAt,
-    colorMode,blocked:!!modal||help,hasData:!!data};
+  keys.current={undoLastEdit,selectAllVisible,setColorMode,expandAll,collapseToRoot,fitView,zoomAt,startEdit,deleteNodes,
+    colorMode,selected,blocked:!!modal||help||!!editingId||!!nodeMenu,hasData:!!data};
   useEffect(()=>{
     const onKey=e=>{
       const k=keys.current,mod=(e.ctrlKey||e.metaKey)&&!e.altKey,key=e.key.toLowerCase();
@@ -323,6 +362,8 @@ export default function App(){
         return;
       }
       if(e.key==="Escape"&&k.colorMode){k.setColorMode(false);return}
+      if(k.colorMode&&k.selected.size&&(e.key==="Delete"||e.key==="Backspace")){e.preventDefault();k.deleteNodes(k.selected);return}
+      if(k.colorMode&&k.selected.size===1&&(e.key==="Enter"||e.key==="F2")){e.preventDefault();k.startEdit([...k.selected][0]);return}
       if(mod||e.altKey)return;
       if(e.key==="?"){setHelp(true);return}
       if(!k.hasData)return;
@@ -347,11 +388,14 @@ export default function App(){
       <div id="sidebarBackdrop" className={isMobile&&!sidebarCollapsed?"":"hidden"} aria-hidden="true"
         onClick={()=>setSidebarCollapsed(true)}/>
 
-      <main id="workspace" ref={workspaceRef}>
+      <main id="workspace" ref={workspaceRef}
+        onScroll={e=>{e.currentTarget.scrollTop=0;e.currentTarget.scrollLeft=0}}>
         <MindMapCanvas ref={canvasRef} layout={layout} mode={mode} transform={transform} setTransform={setTransform}
           transformRef={transformRef} zoomAt={zoomAt} colorMode={colorMode} selected={selected}
           onEnterColorMode={()=>setColorMode(true)} onSelectionChange={setSelected}
-          onSelectNode={selectNode} onToggleNode={toggleNode}/>
+          onSelectNode={selectNode} onToggleNode={toggleNode}
+          editingId={editingId} onStartEdit={startEdit} onCommitEdit={commitEdit} onCancelEdit={()=>setEditingId(null)}
+          onNodeMenu={(id,x,y)=>setNodeMenu({id,x,y})}/>
 
         <TopBar title={active?.name} meta={`${nodeTotal} nodes · saved locally`}
           sidebarOpen={!sidebarCollapsed} onToggleSidebar={toggleSidebar}
@@ -371,16 +415,25 @@ export default function App(){
 
         {colorMode&&<ColorPanel count={selected.size} title={colorState.title}
           current={colorState.current} fallback={colorState.fallback}
-          onApply={applyStyle} onClose={()=>setColorMode(false)}/>}
+          onApply={applyStyle} onClose={()=>setColorMode(false)}
+          onEdit={()=>startEdit([...selected][0])} onDelete={()=>deleteNodes(selected)}
+          canDelete={[...selected].some(id=>id!==data?.id)}/>}
 
         {!data&&<EmptyState onCreate={()=>openModal("new")} onExample={createExample}/>}
-        <Toast message={toast}/>
+        <Toast message={toast.message} action={toast.action}/>
       </main>
 
       {modal&&<ProjectModal key={modal.id||"new"} mode={modal.mode} initialName={modal.name} initialJson={modal.json}
         onSave={saveFromModal} onClose={()=>setModal(null)}/>}
 
       {help&&<HelpDialog onClose={closeHelp}/>}
+
+      {nodeMenu&&nodeIndex.has(nodeMenu.id)&&<NodeMenu x={nodeMenu.x} y={nodeMenu.y}
+        isRoot={nodeMenu.id===data?.id} removeCount={nodeIndex.has(nodeMenu.id)?countNodes(nodeIndex.get(nodeMenu.id)):0}
+        onClose={closeNodeMenu}
+        onEdit={()=>startEdit(nodeMenu.id)}
+        onColor={()=>{setNodeMenu(null);if(!colorMode)setColorMode(true);setSelected(new Set([nodeMenu.id]))}}
+        onDelete={()=>deleteNodes(new Set([nodeMenu.id]))}/>}
 
       {menu&&<ProjectMenu anchor={menu.anchor} onClose={closeMenu}
         onEdit={()=>{setMenu(null);openModal("edit",menu.id)}}
