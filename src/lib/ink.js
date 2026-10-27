@@ -6,8 +6,9 @@ export const PEN_COLORS=["ink","#e5484d","#f76b15","#f5c400","#30a46c","#0090ff"
 // Sizes are in screen pixels at the zoom the stroke is drawn at.
 export const PEN_SIZES=[2,4,7,11,16];
 export const ERASER_SIZES=[12,24,40,64];
+export const LASER_SIZES=[3,5,8,12,18];
 export const INK_KEY="mindmap_studio_ink_v1";
-export const INK_DEFAULTS={color:"ink",size:4,highlighter:false,eraserSize:24,eraserMode:"precise"};
+export const INK_DEFAULTS={color:"ink",size:4,highlighter:false,eraserSize:24,eraserMode:"precise",laserSize:5};
 
 const round=v=>Math.round(v*100)/100;
 

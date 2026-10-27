@@ -44,7 +44,7 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
   const latest=useRef({});
   latest.current={zoomAt,cancelInk};
 
-  /* Laser: a fading trail in screen space, never saved */
+  /* Laser: a trail in screen space that fades after lifting, never saved */
   function laserPoint(e){
     const rect=svgRef.current.getBoundingClientRect();
     return[e.clientX-rect.left,e.clientY-rect.top];
@@ -88,8 +88,9 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
     if(!tool||e.pointerType==="touch"){el.style.opacity="0";return}
     const rect=svgRef.current.getBoundingClientRect();
     if(tool==="laser"){
+      const d=Math.max(8,inkPrefs.laserSize+4);
       el.className="ink-cursor laser";
-      el.style.cssText=`opacity:1;width:12px;height:12px;transform:translate(${e.clientX-rect.left-6}px,${e.clientY-rect.top-6}px);`;
+      el.style.cssText=`opacity:1;width:${d}px;height:${d}px;transform:translate(${e.clientX-rect.left-d/2}px,${e.clientY-rect.top-d/2}px);`;
       return;
     }
     const eraser=erasing||tool==="eraser";
@@ -385,7 +386,7 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
         {selectionRect&&<rect className="selection-rect" {...selectionRect} pointerEvents="none"/>}
       </g>
     </svg>
-    {tool==="laser"&&<LaserLayer ref={laserRef}/>}
+    {tool==="laser"&&<LaserLayer ref={laserRef} size={inkPrefs.laserSize}/>}
     {tool&&<div ref={cursorRef} className="ink-cursor" aria-hidden="true"/>}
     {editingNode&&<NodeEditor key={editingNode.id} node={editingNode} transform={transform}
       onCommit={label=>onCommitEdit(editingNode.id,label)} onCancel={onCancelEdit}/>}

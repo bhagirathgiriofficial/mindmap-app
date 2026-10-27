@@ -190,7 +190,7 @@ kbd{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 
 /* ---------- Presentation ---------- */
 .present-btn{background:var(--accent);color:var(--accent-ink);border-color:transparent}
 .present-btn:hover{background:var(--accent-hover)}
-#app.presenting .topbar,#app.presenting .dock,#app.presenting .corner-tools,#app.presenting .ink-panel,#app.presenting .color-panel{display:none}
+#app.presenting .topbar,#app.presenting .dock,#app.presenting .corner-tools,#app.presenting .ink-panel:not(.laser),#app.presenting .color-panel{display:none}
 .present-bar{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:12;display:flex;align-items:center;gap:4px;padding:6px;border-radius:16px;max-width:calc(100% - 28px);animation:pop .2s cubic-bezier(.2,.8,.2,1);margin-bottom:env(safe-area-inset-bottom)}
 .present-bar .icon-btn{width:40px;height:40px;border-radius:11px}
 .present-progress{position:absolute;left:0;right:0;top:0;height:3px;border-radius:16px 16px 0 0;overflow:hidden;background:var(--border)}

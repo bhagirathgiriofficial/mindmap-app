@@ -1,11 +1,24 @@
 import {Check,Pipette,PenLine,Highlighter,Trash2,Scissors,Eraser} from "lucide-react";
-import {ERASER_SIZES,PEN_COLORS,PEN_SIZES} from "../lib/ink.js";
+import {ERASER_SIZES,LASER_SIZES,PEN_COLORS,PEN_SIZES} from "../lib/ink.js";
 import {contrastText} from "../lib/tree.js";
 
 const fillOf=c=>c==="ink"?"var(--ink)":c;
 
 // Floating tray above the dock with the active ink tool's options.
 export default function InkPanel({tool,prefs,onChange,onClear,hasInk}){
+  if(tool==="laser")return(
+    <div className="ink-panel laser glass" role="toolbar" aria-label="Laser options">
+      <div className="ink-sizes" role="group" aria-label="Laser size">
+        {LASER_SIZES.map((d,i)=>(
+          <button key={d} className={"size-btn"+(prefs.laserSize===d?" on":"")} aria-label={`Laser size ${i+1}`}
+            aria-pressed={prefs.laserSize===d} data-tip={`Size ${i+1} · [ ]`}
+            onMouseDown={e=>e.preventDefault()} onClick={()=>onChange({laserSize:d})}>
+            <span className="size-dot" style={{width:Math.max(3,d),height:Math.max(3,d),background:"#ff3b30",borderRadius:"50%"}}/>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
   if(tool==="eraser")return(
     <div className="ink-panel glass" role="toolbar" aria-label="Eraser options">
       <div className="segmented" role="group" aria-label="Eraser type">

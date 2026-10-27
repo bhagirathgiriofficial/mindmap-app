@@ -37,6 +37,7 @@ import { clearMeasureCache, layoutTree } from "./lib/layout.js";
 import { useViewTransform } from "./hooks/animation.js";
 import {
   ERASER_SIZES,
+  LASER_SIZES,
   PEN_COLORS,
   PEN_SIZES,
   inkBounds,
@@ -349,9 +350,12 @@ export default function App() {
 
   // Steps the active tool's size up or down through its presets.
   function stepSize(dir) {
-    if (tool === "laser") return;
     const [list, key] =
-      tool === "eraser" ? [ERASER_SIZES, "eraserSize"] : [PEN_SIZES, "size"];
+      tool === "eraser"
+        ? [ERASER_SIZES, "eraserSize"]
+        : tool === "laser"
+          ? [LASER_SIZES, "laserSize"]
+          : [PEN_SIZES, "size"];
     const i = list.indexOf(inkPrefs[key]);
     changeInkPrefs({
       [key]:
@@ -752,6 +756,8 @@ export default function App() {
         else if (e.key === "End") k.goToStep(k.stepCount - 1);
         else if (mod || e.altKey) return;
         else if (key === "l") k.toggleTool("laser");
+        else if (k.tool === "laser" && (e.key === "[" || e.key === "]"))
+          k.stepSize(e.key === "]" ? 1 : -1);
         else if (key === "f") k.fitView();
         return;
       }
@@ -905,7 +911,7 @@ export default function App() {
 
         {data && (
           <>
-            {(tool === "pen" || tool === "eraser") && (
+            {tool && (
               <InkPanel
                 tool={tool}
                 prefs={inkPrefs}
