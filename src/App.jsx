@@ -15,6 +15,7 @@ import ProjectModal from "./components/ProjectModal.jsx";
 import ProjectMenu from "./components/ProjectMenu.jsx";
 import NodeMenu from "./components/NodeMenu.jsx";
 import InkPanel from "./components/InkPanel.jsx";
+import PresentBar from "./components/PresentBar.jsx";
 import { HelpDialog, EmptyState, Toast } from "./components/Overlays.jsx";
 import { EXAMPLE, LAYOUT_KEY, THEME_KEY, UNDO_LIMIT } from "./lib/constants.js";
 import { bootstrap, persist } from "./lib/storage.js";
@@ -27,6 +28,7 @@ import {
   indexById,
   normalizePayload,
   patchNodes,
+  presentationSteps,
   removeNodes,
   sanitizeNode,
   uid,
@@ -45,6 +47,8 @@ import {
 const initial = bootstrap();
 const mobileQuery = window.matchMedia("(max-width: 768px)");
 const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+const NEXT_KEYS = new Set(["ArrowRight", "ArrowDown", "PageDown", " ", "Enter"]);
+const PREV_KEYS = new Set(["ArrowLeft", "ArrowUp", "PageUp", "Backspace"]);
 const isTyping = (target) =>
   target.closest?.("input,textarea,select") || target.isContentEditable;
 const readPref = (key, fallback) => {
@@ -60,6 +64,14 @@ const writePref = (key, value) => {
   } catch {}
 };
 const NO_INK = [];
+const boundsOf = (nodes) => {
+  if (!nodes.length) return null;
+  const x0 = Math.min(...nodes.map((n) => n.x - 14)),
+    y0 = Math.min(...nodes.map((n) => n.y)),
+    x1 = Math.max(...nodes.map((n) => n.x + n.w + 14)),
+    y1 = Math.max(...nodes.map((n) => n.y + n.h));
+  return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
+};
 const unionBounds = (a, b) => {
   if (!a || !a.width) return b;
   if (!b) return a;
@@ -72,6 +84,11 @@ const unionBounds = (a, b) => {
     height: Math.max(a.y + a.height, b.y + b.height) - y,
   };
 };
+// Branches kept open for a presentation step: only the path to it, plus itself.
+const stepExpansion = (step, root) =>
+  step.kind === "all"
+    ? new Set([root.id, ...expandableIds(root)])
+    : new Set(step.kind === "branch" ? [...step.path, step.id] : [root.id]);
 // Applied before the first paint so a dark theme never flashes light.
 const initialTheme = readPref(THEME_KEY, darkQuery.matches ? "dark" : "light");
 document.documentElement.dataset.theme = initialTheme;
@@ -109,6 +126,8 @@ export default function App() {
   const [fullscreen, setFullscreen] = useState(false);
   const [fontsReady, setFontsReady] = useState(false);
   const [fitToken, requestFit] = useReducer((x) => x + 1, 0);
+  // { index, restore } while presenting, otherwise null.
+  const [present, setPresent] = useState(null);
 
   // Undo stacks live for the session only, keyed by project id.
   const undoHistories = useRef(new Map());
@@ -132,6 +151,21 @@ export default function App() {
   const strokesRef = useRef(strokes);
   strokesRef.current = strokes;
   const nodeIndex = useMemo(() => indexById(data), [data]);
+
+  const steps = useMemo(() => presentationSteps(data), [data]);
+  const step = present
+    ? steps[Math.min(present.index, steps.length - 1)]
+    : null;
+  // The branch and its children stay bright; everything else is dimmed.
+  const focusIds = useMemo(() => {
+    if (step?.kind !== "branch") return null;
+    const node = nodeIndex.get(step.id);
+    return new Set([step.id, ...(node?.children || []).map((c) => c.id)]);
+  }, [step, nodeIndex]);
+  const focusRef = useRef(focusIds);
+  focusRef.current = focusIds;
+  const presentingRef = useRef(false);
+  presentingRef.current = !!present;
 
   useEffect(() => {
     document.fonts?.ready.then(() => {
@@ -174,27 +208,28 @@ export default function App() {
 
   /* View */
   const fitView = useCallback(() => {
-    const bb = unionBounds(
-        layoutRef.current.bounds,
-        inkBounds(strokesRef.current),
-      ),
+    const focus = focusRef.current,
+      presenting = presentingRef.current;
+    const bb = focus
+        ? boundsOf(layoutRef.current.nodes.filter((n) => focus.has(n.id)))
+        : unionBounds(layoutRef.current.bounds, inkBounds(strokesRef.current)),
       ws = workspaceRef.current;
     if (!bb || !bb.width || !bb.height || !ws) return;
     const w = ws.clientWidth,
       h = ws.clientHeight;
-    // Reserve room for the floating top bar and bottom dock.
+    // Reserve room for the floating chrome (only the presentation bar while presenting).
     const mobile = mobileQuery.matches;
-    const side = mobile ? 20 : 72,
-      top = mobile ? 72 : 84,
-      bottom = (dockRef.current?.offsetHeight || 56) + (mobile ? 28 : 44);
+    const side = mobile ? 20 : presenting ? 96 : 72,
+      top = presenting ? 40 : mobile ? 72 : 84,
+      bottom = presenting
+        ? (mobile ? 96 : 104)
+        : (dockRef.current?.offsetHeight || 56) + (mobile ? 28 : 44);
     const usableW = Math.max(100, w - side * 2),
       usableH = Math.max(100, h - top - bottom);
+    const maxZoom = presenting ? (mobile ? 1.3 : 1.7) : mobile ? 1.15 : 1.25;
     const k = Math.max(
       0.18,
-      Math.min(
-        mobile ? 1.15 : 1.25,
-        Math.min(usableW / bb.width, usableH / bb.height),
-      ),
+      Math.min(maxZoom, Math.min(usableW / bb.width, usableH / bb.height)),
     );
     const target = {
       k,
@@ -361,7 +396,7 @@ export default function App() {
 
   /* Edit and delete nodes */
   function startEdit(id) {
-    if (!nodeIndex.has(id)) return;
+    if (present || !nodeIndex.has(id)) return;
     setNodeMenu(null);
     // The node must be visible to edit it in place.
     if (!layout.nodes.some((n) => n.id === id)) return;
@@ -549,6 +584,11 @@ export default function App() {
 
   /* Expand / collapse */
   function toggleNode(id) {
+    if (present) {
+      const i = steps.findIndex((s) => s.kind === "branch" && s.id === id);
+      if (i >= 0) goToStep(i);
+      return;
+    }
     setExpanded((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
@@ -564,6 +604,51 @@ export default function App() {
     // True collapse-all: leave only the root node visible.
     if (!data) return;
     setExpanded(new Set());
+    requestFit();
+  }
+
+  /* Presentation */
+  function goToStep(i) {
+    if (!data || !steps.length) return;
+    const index = Math.max(0, Math.min(steps.length - 1, i));
+    setPresent((p) => p && { ...p, index });
+    setExpanded(stepExpansion(steps[index], data));
+    requestFit();
+  }
+
+  async function startPresentation() {
+    if (!data || present) return;
+    if (tool !== "laser") setTool(null);
+    setColorMode(false);
+    setEditingId(null);
+    setNodeMenu(null);
+    const restore = {
+      expanded,
+      sidebarCollapsed,
+      enteredFullscreen: !document.fullscreenElement,
+    };
+    setPresent({ index: 0, restore });
+    setExpanded(stepExpansion(steps[0], data));
+    setSidebarCollapsed(true);
+    requestFit();
+    if (restore.enteredFullscreen) {
+      try {
+        await document.documentElement.requestFullscreen();
+      } catch {
+        restore.enteredFullscreen = false;
+      }
+    }
+  }
+
+  function stopPresentation() {
+    if (!present) return;
+    const { restore } = present;
+    setPresent(null);
+    setTool(null);
+    setExpanded(restore.expanded);
+    setSidebarCollapsed(restore.sidebarCollapsed);
+    if (restore.enteredFullscreen && document.fullscreenElement)
+      document.exitFullscreen().catch(() => {});
     requestFit();
   }
 
@@ -636,6 +721,11 @@ export default function App() {
     changeInkPrefs,
     tool,
     inkPrefs,
+    present,
+    stepCount: steps.length,
+    goToStep,
+    startPresentation,
+    stopPresentation,
     colorMode,
     selected,
     blocked: !!modal || help || !!editingId || !!nodeMenu,
@@ -647,6 +737,31 @@ export default function App() {
         mod = (e.ctrlKey || e.metaKey) && !e.altKey,
         key = e.key.toLowerCase();
       if (k.blocked || isTyping(e.target)) return;
+      if (k.present) {
+        const i = k.present.index;
+        if (e.key === "Escape") {
+          if (k.tool) k.setTool(null);
+          else k.stopPresentation();
+        } else if (NEXT_KEYS.has(e.key)) {
+          e.preventDefault();
+          k.goToStep(i + 1);
+        } else if (PREV_KEYS.has(e.key)) {
+          e.preventDefault();
+          k.goToStep(i - 1);
+        } else if (e.key === "Home") k.goToStep(0);
+        else if (e.key === "End") k.goToStep(k.stepCount - 1);
+        else if (mod || e.altKey) return;
+        else if (key === "l") k.toggleTool("laser");
+        else if (key === "f") k.fitView();
+        return;
+      }
+      if (e.key === "F5" && !mod && !e.altKey) {
+        if (k.hasData) {
+          e.preventDefault();
+          k.startPresentation();
+        }
+        return;
+      }
       if (mod && !e.shiftKey && key === "z") {
         if (k.hasData) {
           e.preventDefault();
@@ -720,7 +835,7 @@ export default function App() {
   const nodeTotal = useMemo(() => countNodes(data), [data]);
 
   return (
-    <div id="app">
+    <div id="app" className={present ? "presenting" : undefined}>
       <Sidebar
         projects={projects}
         activeId={activeId}
@@ -763,7 +878,9 @@ export default function App() {
           onStartEdit={startEdit}
           onCommitEdit={commitEdit}
           onCancelEdit={() => setEditingId(null)}
-          onNodeMenu={(id, x, y) => setNodeMenu({ id, x, y })}
+          onNodeMenu={(id, x, y) => !present && setNodeMenu({ id, x, y })}
+          focusIds={focusIds}
+          presenting={!!present}
           tool={data ? tool : null}
           inkPrefs={inkPrefs}
           strokes={strokes}
@@ -782,6 +899,7 @@ export default function App() {
           onEdit={() => activeId && openModal("edit", activeId)}
           fullscreen={fullscreen}
           onFullscreen={toggleFullscreen}
+          onPresent={startPresentation}
           hasData={!!data}
         />
 
@@ -819,6 +937,20 @@ export default function App() {
               />
             </div>
           </>
+        )}
+
+        {step && (
+          <PresentBar
+            index={Math.min(present.index, steps.length - 1)}
+            total={steps.length}
+            step={step}
+            mapName={active?.name}
+            laser={tool === "laser"}
+            onPrev={() => goToStep(present.index - 1)}
+            onNext={() => goToStep(present.index + 1)}
+            onExit={stopPresentation}
+            onLaser={() => toggleTool("laser")}
+          />
         )}
 
         {colorMode && (

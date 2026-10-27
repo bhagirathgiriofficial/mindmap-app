@@ -18,7 +18,7 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
   layout,mode,transform,setTransform,transformRef,zoomAt,
   colorMode,selected,onEnterColorMode,onSelectionChange,onSelectNode,onToggleNode,
   editingId,onStartEdit,onCommitEdit,onCancelEdit,onNodeMenu,
-  tool,inkPrefs,strokes,onInkChange
+  tool,inkPrefs,strokes,onInkChange,focusIds,presenting
 },ref){
   const svgRef=useRef(null);
   const viewportRef=useRef(null);
@@ -174,7 +174,7 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
       startInk(e);
       return;
     }
-    if(e.button!==0||(!colorMode&&!e.shiftKey)||!layout.nodes.length)return;
+    if(e.button!==0||presenting||(!colorMode&&!e.shiftKey)||!layout.nodes.length)return;
     if(!colorMode)onEnterColorMode();
     if(selection.current){cancelSelection();return}
     selection.current={
@@ -347,7 +347,8 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
   // its methods are refreshed every render so they always see current props.
   const nodeHandlers=useRef({}).current;
   Object.assign(nodeHandlers,{handleNodeClick,handleToggleClick,handleDoubleClick,handleContextMenu,handleNodePointerDown,cancelLongPress});
-  const linkPaths=useMemo(()=>links.map(l=><path key={l.id} className="branch" d={l.d} fill={l.color} opacity={l.opacity*.9}/>),[links]);
+  const linkPaths=useMemo(()=>links.map(l=><path key={l.id} className="branch" d={l.d} fill={l.color}
+    opacity={l.opacity*.9*(focusIds&&!focusIds.has(l.id)?.22:1)}/>),[links,focusIds]);
 
   // Grid spacing follows zoom so the dots feel attached to the canvas.
   const grid=24*transform.k;
@@ -377,6 +378,7 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
         </g>
         <g className="nodes">
           {nodes.map(n=><MapNode key={n.id} n={n} mode={mode} selected={selected.has(n.id)} editing={n.id===editingId}
+            dimmed={!!focusIds&&!focusIds.has(n.id)}
             handlers={nodeHandlers}/>)}
         </g>
         <InkLayer ref={inkRef} strokes={strokes}/>
@@ -430,14 +432,14 @@ function NodeEditor({node,transform,onCommit,onCancel}){
   );
 }
 
-const MapNode=memo(function MapNode({n,mode,selected,editing,handlers:h}){
+const MapNode=memo(function MapNode({n,mode,selected,editing,dimmed,handlers:h}){
   const style=nodeStyle(n.depth);
   const radius=Math.min(style.radius,n.h/2);
   // The root's toggle only appears when it would not sit on top of a branch.
   const showToggle=n.hasChildren&&(!n.root||!n.expanded||mode==="right");
   const tx=n.side>0?n.w+TOGGLE_R+3:-TOGGLE_R-3,ty=n.h/2;
   return(
-    <g className={`node depth-${Math.min(n.depth,2)}${n.root?" root":""}${selected?" selected":""}`}
+    <g className={`node depth-${Math.min(n.depth,2)}${n.root?" root":""}${selected?" selected":""}${dimmed?" dimmed":""}`}
       transform={`translate(${n.x},${n.y})`} opacity={n.opacity??1}
       onPointerDown={e=>h.handleNodePointerDown(e,n)}
       onPointerMove={h.cancelLongPress} onPointerUp={h.cancelLongPress} onPointerCancel={h.cancelLongPress}

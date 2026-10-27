@@ -131,3 +131,22 @@ export function countRemoved(root,ids){
   })(root);
   return total;
 }
+
+/*
+ * Presentation order: an overview, then every branch that has children in
+ * outline (depth-first) order, then the whole map. `path` holds the ids
+ * that must stay open for the branch to be visible.
+ */
+export function presentationSteps(root){
+  if(!root)return [];
+  const steps=[{kind:"overview",id:root.id,label:root.label,path:[]}];
+  (function walk(n,path){
+    for(const c of n.children||[]){
+      if(!c.children?.length)continue;
+      steps.push({kind:"branch",id:c.id,label:c.label,path});
+      walk(c,[...path,c.id]);
+    }
+  })(root,[root.id]);
+  if(steps.length>1)steps.push({kind:"all",id:root.id,label:root.label,path:[]});
+  return steps;
+}

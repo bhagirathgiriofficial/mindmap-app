@@ -23,6 +23,14 @@ const SHORTCUTS=[
     ["Edit selected node",["Enter"]],
     ["Delete selected nodes",["Del"]]
   ]],
+  ["Present",[
+    ["Start presenting",["F5"]],
+    ["Next / previous branch",["→","←"]],
+    ["Also next","Space · Enter · ↓"],
+    ["First / last step",["Home","End"]],
+    ["Jump to a branch","Click it"],
+    ["End presentation",["Esc"]]
+  ]],
   ["Draw",[
     ["Pen on / off",["P"]],
     ["Eraser on / off",["E"]],
