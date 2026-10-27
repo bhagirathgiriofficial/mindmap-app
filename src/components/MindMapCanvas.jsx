@@ -1,4 +1,4 @@
-import {forwardRef,useEffect,useImperativeHandle,useLayoutEffect,useMemo,useRef,useState} from "react";
+import {forwardRef,memo,useEffect,useImperativeHandle,useLayoutEffect,useMemo,useRef,useState} from "react";
 import {buildLinks,nodeStyle} from "../lib/layout.js";
 import {useTweenedNodes} from "../hooks/animation.js";
 import {contrastText} from "../lib/tree.js";
@@ -309,6 +309,12 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
   }
   useEffect(()=>()=>{clearTimeout(clickTimer.current);clearTimeout(longPress.current?.timer)},[]);
 
+  // One stable handler object lets memoized nodes skip re-rendering while panning;
+  // its methods are refreshed every render so they always see current props.
+  const nodeHandlers=useRef({}).current;
+  Object.assign(nodeHandlers,{handleNodeClick,handleToggleClick,handleDoubleClick,handleContextMenu,handleNodePointerDown,cancelLongPress});
+  const linkPaths=useMemo(()=>links.map(l=><path key={l.id} className="branch" d={l.d} fill={l.color} opacity={l.opacity*.9}/>),[links]);
+
   // Grid spacing follows zoom so the dots feel attached to the canvas.
   const grid=24*transform.k;
 
@@ -333,11 +339,11 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
       <rect className="grid-bg" width="100%" height="100%" fill="url(#dotGrid)"/>
       <g ref={viewportRef} transform={`translate(${transform.x} ${transform.y}) scale(${transform.k})`}>
         <g className="links">
-          {links.map(l=><path key={l.id} className="branch" d={l.d} fill={l.color} opacity={l.opacity*.9}/>)}
+          {linkPaths}
         </g>
         <g className="nodes">
           {nodes.map(n=><MapNode key={n.id} n={n} mode={mode} selected={selected.has(n.id)} editing={n.id===editingId}
-            handlers={{handleNodeClick,handleToggleClick,handleDoubleClick,handleContextMenu,handleNodePointerDown,cancelLongPress}}/>)}
+            handlers={nodeHandlers}/>)}
         </g>
         <InkLayer ref={inkRef} strokes={strokes}/>
         {selectionRect&&<rect className="selection-rect" {...selectionRect} pointerEvents="none"/>}
@@ -389,7 +395,7 @@ function NodeEditor({node,transform,onCommit,onCancel}){
   );
 }
 
-function MapNode({n,mode,selected,editing,handlers:h}){
+const MapNode=memo(function MapNode({n,mode,selected,editing,handlers:h}){
   const style=nodeStyle(n.depth);
   const radius=Math.min(style.radius,n.h/2);
   // The root's toggle only appears when it would not sit on top of a branch.
@@ -424,6 +430,6 @@ function MapNode({n,mode,selected,editing,handlers:h}){
       )}
     </g>
   );
-}
+});
 
 export default MindMapCanvas;

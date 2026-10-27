@@ -67,11 +67,16 @@ export function addPoint(s,x,y,pressure,minGap=0){
   return true;
 }
 
+// Strokes are never mutated once saved, so their bounds can be cached.
+const boundsCache=new WeakMap();
 export function strokeBounds(s){
+  const cached=boundsCache.get(s);
+  if(cached)return cached;
   let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
   for(const [x,y] of s.points){if(x<x0)x0=x;if(y<y0)y0=y;if(x>x1)x1=x;if(y>y1)y1=y}
-  const r=s.size;
-  return{x0:x0-r,y0:y0-r,x1:x1+r,y1:y1+r};
+  const r=s.size,b={x0:x0-r,y0:y0-r,x1:x1+r,y1:y1+r};
+  boundsCache.set(s,b);
+  return b;
 }
 
 export function inkBounds(strokes){

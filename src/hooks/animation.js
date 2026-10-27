@@ -27,8 +27,10 @@ export function useTweenedNodes(nodes){
       start.set(n.id,ps?{x:ps.x+p.w/2-n.w/2,y:ps.y+p.h/2-n.h/2,o:0}:{x:n.x,y:n.y,o:1});
     }
 
+    // Nodes that don't move keep their object, so memoized nodes skip re-rendering.
     const at=t=>nodes.map(n=>{
       const s=start.get(n.id);
+      if(s.o===1&&s.x===n.x&&s.y===n.y)return n;
       return{...n,x:lerp(s.x,n.x,t),y:lerp(s.y,n.y,t),opacity:lerp(s.o,1,t)};
     });
     const t0=performance.now();

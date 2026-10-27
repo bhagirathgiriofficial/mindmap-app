@@ -14,8 +14,19 @@ const measureCtx=document.createElement("canvas").getContext("2d");
 
 export function nodeStyle(depth){return NODE_STYLE[Math.min(depth,2)]}
 
-// Wraps text the way the label <div> will and returns its line count and widest line.
+// Label measurements keyed by style and text; cleared when the web font finishes loading.
+const measureCache=new Map();
+export function clearMeasureCache(){measureCache.clear()}
+
 function measureText(text,style){
+  const key=style.size+"|"+style.weight+"|"+text;
+  let m=measureCache.get(key);
+  if(!m){m=wrapText(text,style);measureCache.set(key,m)}
+  return m;
+}
+
+// Wraps text the way the label <div> will and returns its line count and widest line.
+function wrapText(text,style){
   measureCtx.font=`${style.weight} ${style.size}px ${FONT_FAMILY}`;
   const width=s=>measureCtx.measureText(s).width;
   const lines=[];let line="";
