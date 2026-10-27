@@ -1,7 +1,7 @@
 import {forwardRef} from "react";
 import {
   PanelLeft,Moon,Sun,FileJson,Maximize,Minimize,Undo2,ListTree,ListCollapse,
-  Palette,Plus,Minus,Scan,Keyboard,Columns2,PanelRight
+  Palette,Plus,Minus,Scan,Keyboard,Columns2,PanelRight,PenLine,Eraser
 } from "lucide-react";
 import {UNDO_LIMIT} from "../lib/constants.js";
 
@@ -44,7 +44,7 @@ export function TopBar({title,meta,sidebarOpen,onToggleSidebar,theme,onToggleThe
   );
 }
 
-export const Dock=forwardRef(function Dock({undoCount,colorMode,onUndo,onExpand,onCollapse,onToggleColor,onFit,onHelp},ref){
+export const Dock=forwardRef(function Dock({undoCount,colorMode,tool,penColor,onTool,onUndo,onExpand,onCollapse,onToggleColor,onFit,onHelp},ref){
   return(
     <div className="dock glass" ref={ref} aria-label="Mind map controls">
       <IconButton icon={Undo2} label={undoCount?`Undo (${undoCount} of ${UNDO_LIMIT})`:"Undo"} shortcut={`${MOD}Z`}
@@ -52,10 +52,14 @@ export const Dock=forwardRef(function Dock({undoCount,colorMode,onUndo,onExpand,
         {undoCount>0&&<span className="badge">{undoCount}</span>}
       </IconButton>
       <span className="dock-divider"/>
-      <IconButton icon={ListTree} label="Expand all" shortcut="E" onClick={onExpand}/>
+      <IconButton icon={ListTree} label="Expand all" shortcut="O" onClick={onExpand}/>
       <IconButton icon={ListCollapse} label="Collapse all" shortcut="C" onClick={onCollapse}/>
       <span className="dock-divider"/>
       <IconButton icon={Palette} label="Select & color" shortcut="Shift-drag" active={colorMode} onClick={onToggleColor}/>
+      <IconButton icon={PenLine} label="Pen" shortcut="P" active={tool==="pen"} onClick={()=>onTool("pen")}>
+        <span className="pen-chip" style={{"--c":penColor==="ink"?"var(--ink)":penColor}}/>
+      </IconButton>
+      <IconButton icon={Eraser} label="Eraser" shortcut="E" active={tool==="eraser"} onClick={()=>onTool("eraser")}/>
       <IconButton className="show-mobile" icon={Scan} label="Fit view" onClick={onFit}/>
       <IconButton className="hide-mobile" icon={Keyboard} label="Shortcuts" shortcut="?" onClick={onHelp}/>
     </div>

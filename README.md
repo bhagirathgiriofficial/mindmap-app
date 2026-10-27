@@ -13,7 +13,8 @@ A lightweight, offline-first interactive mind-map presentation app built with Re
 - Multiple maps stored in browser `localStorage`, with search, duplicate, and delete
 - Edit node text in place and delete nodes (with undo)
 - Click-to-color styling with preset swatches and a custom picker
-- 10-step undo per map
+- Whiteboard-style ink: a smooth, pressure-sensitive pen (**P**) and highlighter (**H**) with 8 colors, a custom color, and 5 sizes; an eraser (**E**) with 4 sizes that erases precisely or whole strokes; palm rejection and the stylus eraser end are supported
+- 10-step undo per map (covers ink too); **O** opens (expands) every branch
 - Touch-friendly: pinch to zoom, bottom dock and sheets on phones
 - No backend, database, or internet connection required at runtime
 

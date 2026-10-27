@@ -6,12 +6,14 @@ import MindMapCanvas from "./components/MindMapCanvas.jsx";
 import ProjectModal from "./components/ProjectModal.jsx";
 import ProjectMenu from "./components/ProjectMenu.jsx";
 import NodeMenu from "./components/NodeMenu.jsx";
+import InkPanel from "./components/InkPanel.jsx";
 import {HelpDialog,EmptyState,Toast} from "./components/Overlays.jsx";
 import {EXAMPLE,LAYOUT_KEY,THEME_KEY,UNDO_LIMIT} from "./lib/constants.js";
 import {bootstrap,persist} from "./lib/storage.js";
 import {buildStyleMap,countNodes,countRemoved,deepCopy,expandableIds,indexById,normalizePayload,patchNodes,removeNodes,sanitizeNode,uid} from "./lib/tree.js";
 import {layoutTree} from "./lib/layout.js";
 import {useViewTransform} from "./hooks/animation.js";
+import {ERASER_SIZES,PEN_COLORS,PEN_SIZES,inkBounds,loadInkPrefs,saveInkPrefs} from "./lib/ink.js";
 
 const initial=bootstrap();
 const mobileQuery=window.matchMedia("(max-width: 768px)");
@@ -19,6 +21,13 @@ const darkQuery=window.matchMedia("(prefers-color-scheme: dark)");
 const isTyping=target=>target.closest?.("input,textarea,select")||target.isContentEditable;
 const readPref=(key,fallback)=>{try{return localStorage.getItem(key)||fallback}catch{return fallback}};
 const writePref=(key,value)=>{try{localStorage.setItem(key,value)}catch{}};
+const NO_INK=[];
+const unionBounds=(a,b)=>{
+  if(!a||!a.width)return b;
+  if(!b)return a;
+  const x=Math.min(a.x,b.x),y=Math.min(a.y,b.y);
+  return{x,y,width:Math.max(a.x+a.width,b.x+b.width)-x,height:Math.max(a.y+a.height,b.y+b.height)-y};
+};
 // Applied before the first paint so a dark theme never flashes light.
 const initialTheme=readPref(THEME_KEY,darkQuery.matches?"dark":"light");
 document.documentElement.dataset.theme=initialTheme;
@@ -28,10 +37,13 @@ export default function App(){
   const [activeId,setActiveId]=useState(initial.activeId);
   const active=projects.find(p=>p.id===activeId)||null;
   const data=active?.data||null;
+  const strokes=active?.ink||NO_INK;
 
   const [expanded,setExpanded]=useState(()=>new Set(data?[data.id]:[]));
   const {transform,transformRef,set:setTransform,animateTo}=useViewTransform({x:80,y:70,k:1});
   const [colorMode,setColorModeState]=useState(false);
+  const [tool,setToolState]=useState(null);
+  const [inkPrefs,setInkPrefs]=useState(loadInkPrefs);
   const [selected,setSelected]=useState(()=>new Set());
   const [modal,setModal]=useState(null);
   const [menu,setMenu]=useState(null);
@@ -63,6 +75,8 @@ export default function App(){
   const layout=useMemo(()=>layoutTree(data,expanded,styles,mode),[data,expanded,styles,mode,fontsReady]);
   const layoutRef=useRef(layout);
   layoutRef.current=layout;
+  const strokesRef=useRef(strokes);
+  strokesRef.current=strokes;
   const nodeIndex=useMemo(()=>indexById(data),[data]);
 
   useEffect(()=>{document.fonts?.ready.then(()=>setFontsReady(true))},[]);
@@ -91,7 +105,7 @@ export default function App(){
 
   /* View */
   const fitView=useCallback(()=>{
-    const bb=layoutRef.current.bounds,ws=workspaceRef.current;
+    const bb=unionBounds(layoutRef.current.bounds,inkBounds(strokesRef.current)),ws=workspaceRef.current;
     if(!bb||!bb.width||!bb.height||!ws)return;
     const w=ws.clientWidth,h=ws.clientHeight;
     // Reserve room for the floating top bar and bottom dock.
@@ -121,6 +135,7 @@ export default function App(){
 
   /* Color selection */
   function setColorMode(enabled){
+    if(enabled)setTool(null);
     setColorModeState(enabled);
     setSelected(new Set());
     canvasRef.current?.cancelSelection();
@@ -158,8 +173,45 @@ export default function App(){
     if(!active||JSON.stringify(nextData)===JSON.stringify(active.data))return false;
     const next=projects.map(p=>p.id===active.id?{...p,data:nextData,updatedAt:Date.now()}:p);
     if(!commit(next)){showToast(failMessage||"Could not save — browser storage may be full");return false}
-    recordUndo(active.id,{name:active.name,data:active.data});
+    recordUndo(active.id,{name:active.name,data:active.data,ink:active.ink});
     return true;
+  }
+
+  /* Ink */
+  function setTool(next){
+    canvasRef.current?.cancelInk();
+    setToolState(next);
+    if(next){
+      setColorModeState(false);setSelected(new Set());
+      canvasRef.current?.cancelSelection();
+      setEditingId(null);setNodeMenu(null);
+    }
+  }
+  const toggleTool=name=>setTool(tool===name?null:name);
+
+  function changeInkPrefs(patch){
+    setInkPrefs(prev=>{const next={...prev,...patch};saveInkPrefs(next);return next});
+  }
+
+  // Steps the active tool's size up or down through its presets.
+  function stepSize(dir){
+    const [list,key]=tool==="eraser"?[ERASER_SIZES,"eraserSize"]:[PEN_SIZES,"size"];
+    const i=list.indexOf(inkPrefs[key]);
+    changeInkPrefs({[key]:list[Math.max(0,Math.min(list.length-1,(i<0?1:i)+dir))]});
+  }
+
+  // Saves the active map's strokes as one undo step.
+  function saveInk(nextInk){
+    if(!active)return false;
+    const next=projects.map(p=>p.id===active.id?{...p,ink:nextInk,updatedAt:Date.now()}:p);
+    if(!commit(next)){showToast("Could not save ink — browser storage may be full");return false}
+    recordUndo(active.id,{name:active.name,data:active.data,ink:active.ink});
+    return true;
+  }
+
+  function clearInk(){
+    if(!strokes.length)return;
+    if(saveInk([]))showToast("Cleared all ink",{label:"Undo",onClick:()=>keys.current.undoLastEdit()});
   }
 
   function applyStyle(patch){
@@ -200,11 +252,12 @@ export default function App(){
     const history=undoHistories.current.get(activeId);
     if(!active||!history?.length)return;
     const snapshot=history[history.length-1];
-    const next=projects.map(p=>p.id===active.id?{...p,name:snapshot.name,data:deepCopy(snapshot.data),updatedAt:Date.now()}:p);
+    const next=projects.map(p=>p.id===active.id?{...p,name:snapshot.name,data:deepCopy(snapshot.data),ink:snapshot.ink,updatedAt:Date.now()}:p);
     if(!commit(next)){showToast("Could not undo — browser storage may be full");return}
     history.pop();bumpUndo();
     // Expansion is keyed by node id, so it carries over to the restored tree.
     canvasRef.current?.cancelSelection();
+    canvasRef.current?.cancelInk();
     setSelected(new Set());
     showToast("Undone");
   }
@@ -212,6 +265,7 @@ export default function App(){
   /* Projects */
   function showProject(project){
     setEditingId(null);setNodeMenu(null);
+    canvasRef.current?.cancelInk();
     setExpanded(new Set(project?[project.data.id]:[]));
     setColorMode(false);
     requestFit();
@@ -246,7 +300,7 @@ export default function App(){
       const changed=p.name!==finalName||JSON.stringify(p.data)!==JSON.stringify(normalized.data);
       const project={...p,name:finalName,data:normalized.data,updatedAt:Date.now()};
       if(!commit(projects.map(x=>x.id===p.id?project:x),p.id))return "Could not save — browser storage may be full.";
-      if(changed)recordUndo(p.id,{name:p.name,data:deepCopy(p.data)});
+      if(changed)recordUndo(p.id,{name:p.name,data:deepCopy(p.data),ink:p.ink});
       setModal(null);
       showProject(project);
       return null;
@@ -348,6 +402,7 @@ export default function App(){
   // Keyboard shortcuts read the latest handlers through a ref.
   const keys=useRef(null);
   keys.current={undoLastEdit,selectAllVisible,setColorMode,expandAll,collapseToRoot,fitView,zoomAt,startEdit,deleteNodes,
+    setTool,toggleTool,stepSize,changeInkPrefs,tool,inkPrefs,
     colorMode,selected,blocked:!!modal||help||!!editingId||!!nodeMenu,hasData:!!data};
   useEffect(()=>{
     const onKey=e=>{
@@ -361,14 +416,20 @@ export default function App(){
         if(k.hasData){e.preventDefault();k.selectAllVisible()}
         return;
       }
+      if(e.key==="Escape"&&k.tool){k.setTool(null);return}
       if(e.key==="Escape"&&k.colorMode){k.setColorMode(false);return}
       if(k.colorMode&&k.selected.size&&(e.key==="Delete"||e.key==="Backspace")){e.preventDefault();k.deleteNodes(k.selected);return}
       if(k.colorMode&&k.selected.size===1&&(e.key==="Enter"||e.key==="F2")){e.preventDefault();k.startEdit([...k.selected][0]);return}
       if(mod||e.altKey)return;
       if(e.key==="?"){setHelp(true);return}
       if(!k.hasData)return;
-      if(key==="f")k.fitView();
-      else if(key==="e")k.expandAll();
+      if(key==="p")k.toggleTool("pen");
+      else if(key==="e")k.toggleTool("eraser");
+      else if(key==="h"){k.changeInkPrefs({highlighter:!(k.tool==="pen"&&k.inkPrefs.highlighter)});k.setTool("pen")}
+      else if(k.tool&&(e.key==="["||e.key==="]"))k.stepSize(e.key==="]"?1:-1);
+      else if(k.tool==="pen"&&/^[1-8]$/.test(e.key))k.changeInkPrefs({color:PEN_COLORS[+e.key-1]});
+      else if(key==="f")k.fitView();
+      else if(key==="o")k.expandAll();
       else if(key==="c")k.collapseToRoot();
       else if(key==="="||key==="+")k.zoomAt(1.2,undefined,undefined,true);
       else if(key==="-"||key==="_")k.zoomAt(1/1.2,undefined,undefined,true);
@@ -395,7 +456,8 @@ export default function App(){
           onEnterColorMode={()=>setColorMode(true)} onSelectionChange={setSelected}
           onSelectNode={selectNode} onToggleNode={toggleNode}
           editingId={editingId} onStartEdit={startEdit} onCommitEdit={commitEdit} onCancelEdit={()=>setEditingId(null)}
-          onNodeMenu={(id,x,y)=>setNodeMenu({id,x,y})}/>
+          onNodeMenu={(id,x,y)=>setNodeMenu({id,x,y})}
+          tool={data?tool:null} inkPrefs={inkPrefs} strokes={strokes} onInkChange={saveInk}/>
 
         <TopBar title={active?.name} meta={`${nodeTotal} nodes · saved locally`}
           sidebarOpen={!sidebarCollapsed} onToggleSidebar={toggleSidebar}
@@ -404,7 +466,9 @@ export default function App(){
           fullscreen={fullscreen} onFullscreen={toggleFullscreen} hasData={!!data}/>
 
         {data&&<>
+          {tool&&<InkPanel tool={tool} prefs={inkPrefs} onChange={changeInkPrefs} onClear={clearInk} hasInk={strokes.length>0}/>}
           <Dock ref={dockRef} undoCount={undoCount} colorMode={colorMode} onUndo={undoLastEdit}
+            tool={tool} penColor={inkPrefs.color} onTool={toggleTool}
             onExpand={expandAll} onCollapse={collapseToRoot}
             onToggleColor={()=>setColorMode(!colorMode)} onFit={fitView} onHelp={()=>setHelp(true)}/>
           <div className="corner-tools">

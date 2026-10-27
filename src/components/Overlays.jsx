@@ -13,7 +13,7 @@ const SHORTCUTS=[
   ]],
   ["Map",[
     ["Open / close a branch","Click a node"],
-    ["Expand all",["E"]],
+    ["Expand all (open)",["O"]],
     ["Collapse all",["C"]],
     ["Undo",[MOD,"Z"]]
   ]],
@@ -22,6 +22,15 @@ const SHORTCUTS=[
     ["Node menu","Right-click · long-press"],
     ["Edit selected node",["Enter"]],
     ["Delete selected nodes",["Del"]]
+  ]],
+  ["Draw",[
+    ["Pen on / off",["P"]],
+    ["Eraser on / off",["E"]],
+    ["Highlighter",["H"]],
+    ["Pen color",["1","–","8"]],
+    ["Smaller / bigger",["[","]"]],
+    ["Pan while drawing","Scroll · middle-drag"],
+    ["Put the tool down",["Esc"]]
   ]],
   ["Select & color",[
     ["Select nodes","Shift + drag"],

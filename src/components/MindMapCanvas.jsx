@@ -2,6 +2,8 @@ import {forwardRef,useEffect,useImperativeHandle,useLayoutEffect,useMemo,useRef,
 import {buildLinks,nodeStyle} from "../lib/layout.js";
 import {useTweenedNodes} from "../hooks/animation.js";
 import {contrastText} from "../lib/tree.js";
+import {addPoint,eraseSegment,makeStroke} from "../lib/ink.js";
+import InkLayer from "./InkLayer.jsx";
 
 const PINCH_MIN=.18,PINCH_MAX=3.2;
 const TOGGLE_R=10;
@@ -9,12 +11,13 @@ const DOUBLE_CLICK_MS=220,LONG_PRESS_MS=520;
 
 /*
  * SVG canvas: renders the laid-out map and owns pointer gestures
- * (pan, wheel zoom, pinch zoom and rectangle selection), plus inline label editing.
+ * (pan, wheel zoom, pinch zoom, rectangle selection and ink), plus inline label editing.
  */
 const MindMapCanvas=forwardRef(function MindMapCanvas({
   layout,mode,transform,setTransform,transformRef,zoomAt,
   colorMode,selected,onEnterColorMode,onSelectionChange,onSelectNode,onToggleNode,
-  editingId,onStartEdit,onCommitEdit,onCancelEdit,onNodeMenu
+  editingId,onStartEdit,onCommitEdit,onCancelEdit,onNodeMenu,
+  tool,inkPrefs,strokes,onInkChange
 },ref){
   const svgRef=useRef(null);
   const viewportRef=useRef(null);
@@ -25,13 +28,28 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
   const [panning,setPanning]=useState(false);
   const clickTimer=useRef(0);
   const longPress=useRef(null);
+  const inkRef=useRef(null);
+  const cursorRef=useRef(null);
+  const ink=useRef(null);
+  // After a stylus is used, fingers pan instead of drawing (palm rejection).
+  const penSeen=useRef(false);
 
   const nodes=useTweenedNodes(layout.nodes);
   const links=useMemo(()=>buildLinks(nodes),[nodes]);
 
   // Latest zoom handler for native listeners that are registered once.
   const latest=useRef({});
-  latest.current={zoomAt};
+  latest.current={zoomAt,cancelInk};
+
+  function cancelInk(){
+    const d=ink.current;
+    if(!d)return;
+    ink.current=null;
+    cancelAnimationFrame(d.raf);
+    try{svgRef.current.releasePointerCapture(d.pointerId)}catch{}
+    inkRef.current?.drawLive(null);
+    inkRef.current?.setPreview(null);
+  }
 
   function cancelSelection(){
     if(selection.current){
@@ -41,14 +59,93 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
     setSelectionRect(null);
   }
 
-  useImperativeHandle(ref,()=>({svg:svgRef.current,cancelSelection}));
+  useImperativeHandle(ref,()=>({svg:svgRef.current,cancelSelection,cancelInk}));
 
   function toWorld(e){
     return new DOMPoint(e.clientX,e.clientY).matrixTransform(viewportRef.current.getScreenCTM().inverse());
   }
 
+  /* Ink */
+  function moveCursor(e,erasing){
+    const el=cursorRef.current;
+    if(!el)return;
+    if(!tool||e.pointerType==="touch"){el.style.opacity="0";return}
+    const rect=svgRef.current.getBoundingClientRect();
+    const eraser=erasing||tool==="eraser";
+    const d=eraser?inkPrefs.eraserSize:inkPrefs.highlighter?inkPrefs.size*3+8:Math.max(4,inkPrefs.size);
+    el.className="ink-cursor"+(eraser?" eraser":"")+(inkPrefs.highlighter&&!eraser?" highlighter":"");
+    el.style.cssText=`opacity:1;width:${d}px;height:${d}px;transform:translate(${e.clientX-rect.left-d/2}px,${e.clientY-rect.top-d/2}px);`
+      +(eraser?"":`--c:${inkPrefs.color==="ink"?"var(--ink)":inkPrefs.color}`);
+  }
+
+  function startInk(e){
+    const isPen=e.pointerType==="pen";
+    if(isPen)penSeen.current=true;
+    // The stylus's eraser end (or barrel button) erases while held.
+    const erasing=tool==="eraser"||(isPen&&(e.buttons&32||e.button===5));
+    const p=toWorld(e),k=transformRef.current.k;
+    const d={pointerId:e.pointerId,erasing,k,last:p,raf:0};
+    if(erasing){
+      d.base=strokes;d.working=strokes;
+      d.working=eraseSegment(d.working,p,p,inkPrefs.eraserSize/2/k,inkPrefs.eraserMode);
+      if(d.working!==d.base)inkRef.current?.setPreview(d.working);
+    }else{
+      d.stroke=makeStroke(inkPrefs,k,!isPen);
+      addPoint(d.stroke,p.x,p.y,e.pressure);
+      inkRef.current?.drawLive(d.stroke);
+    }
+    ink.current=d;
+    moveCursor(e,erasing);
+    try{svgRef.current.setPointerCapture(e.pointerId)}catch{}
+  }
+
+  function moveInk(e){
+    const d=ink.current;
+    const events=e.nativeEvent.getCoalescedEvents?.()||[];
+    const samples=events.length?events:[e.nativeEvent];
+    if(d.erasing){
+      let working=d.working;
+      for(const ev of samples){
+        const p=toWorld(ev);
+        working=eraseSegment(working,d.last,p,inkPrefs.eraserSize/2/d.k,inkPrefs.eraserMode);
+        d.last=p;
+      }
+      if(working!==d.working){d.working=working;inkRef.current?.setPreview(working)}
+      return;
+    }
+    let added=false;
+    for(const ev of samples){
+      const p=toWorld(ev);
+      added=addPoint(d.stroke,p.x,p.y,ev.pressure,.5/d.k)||added;
+    }
+    if(added&&!d.raf)d.raf=requestAnimationFrame(()=>{d.raf=0;if(ink.current===d)inkRef.current?.drawLive(d.stroke)});
+  }
+
+  function endInk(){
+    const d=ink.current;
+    ink.current=null;
+    cancelAnimationFrame(d.raf);
+    try{svgRef.current.releasePointerCapture(d.pointerId)}catch{}
+    if(d.erasing){
+      if(d.working===d.base||!onInkChange(d.working))inkRef.current?.setPreview(null);
+      return;
+    }
+    inkRef.current?.drawLive(d.stroke);
+    if(!onInkChange([...strokes,d.stroke]))inkRef.current?.drawLive(null);
+  }
+
   // Capture selection gestures before individual cards consume pointer events.
   function handlePointerDownCapture(e){
+    if(tool){
+      // Touch pans once a stylus has been used; middle-click always pans.
+      if(e.button===1||(e.pointerType==="touch"&&penSeen.current))return;
+      e.stopPropagation();
+      if(!e.isPrimary){cancelInk();return}
+      if(e.button!==0&&!(e.pointerType==="pen"&&e.button===5))return;
+      if(ink.current)cancelInk();
+      startInk(e);
+      return;
+    }
     if(e.button!==0||(!colorMode&&!e.shiftKey)||!layout.nodes.length)return;
     if(!colorMode)onEnterColorMode();
     if(selection.current){cancelSelection();return}
@@ -61,13 +158,15 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
 
   function handlePointerDown(e){
     // Start panning only from empty canvas space, never from a node/card.
-    if(colorMode||selection.current||e.button!==0)return;
+    if(colorMode||selection.current||ink.current||(e.button!==0&&!(tool&&e.button===1)))return;
     pan.current={x:e.clientX,y:e.clientY,tx:transform.x,ty:transform.y};
     setPanning(true);
     try{svgRef.current.setPointerCapture(e.pointerId)}catch{}
   }
 
   function handlePointerMove(e){
+    if(tool)moveCursor(e,ink.current?.erasing);
+    if(ink.current&&e.pointerId===ink.current.pointerId){moveInk(e);return}
     const drag=selection.current;
     if(drag&&e.pointerId===drag.pointerId){
       if(!drag.moved&&Math.hypot(e.clientX-drag.clientX,e.clientY-drag.clientY)<5)return;
@@ -90,6 +189,7 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
   }
 
   function handlePointerUp(e){
+    if(ink.current&&e.pointerId===ink.current.pointerId){endInk();return}
     const drag=selection.current;
     if(drag&&e.pointerId===drag.pointerId){
       if(!drag.moved){
@@ -128,6 +228,7 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
       if(e.touches.length!==2)return;
       e.preventDefault();
       cancelSelection();
+      latest.current.cancelInk();
       pan.current=null;setPanning(false);
       const [a,b]=e.touches;
       Object.assign(pinch,{active:true,distance:dist(a,b),center:center(a,b),start:{...transformRef.current}});
@@ -215,12 +316,14 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
 
   return(
     <>
-    <svg id="canvas" ref={svgRef} className={colorMode?"selecting":panning?"dragging":""} aria-label="Interactive mind map"
+    <svg id="canvas" ref={svgRef} className={[tool?"inking "+tool:colorMode?"selecting":"",panning?"dragging":""].join(" ").trim()}
+      aria-label="Interactive mind map"
       onPointerDownCapture={handlePointerDownCapture}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      onPointerCancel={e=>{cancelSelection();endPan(e)}}>
+      onPointerLeave={e=>{if(e.pointerType!=="touch"&&cursorRef.current)cursorRef.current.style.opacity="0"}}
+      onPointerCancel={e=>{cancelSelection();cancelInk();endPan(e)}}>
       <defs>
         <pattern id="dotGrid" patternUnits="userSpaceOnUse" width={grid} height={grid}
           x={transform.x%grid} y={transform.y%grid}>
@@ -236,9 +339,11 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
           {nodes.map(n=><MapNode key={n.id} n={n} mode={mode} selected={selected.has(n.id)} editing={n.id===editingId}
             handlers={{handleNodeClick,handleToggleClick,handleDoubleClick,handleContextMenu,handleNodePointerDown,cancelLongPress}}/>)}
         </g>
+        <InkLayer ref={inkRef} strokes={strokes}/>
         {selectionRect&&<rect className="selection-rect" {...selectionRect} pointerEvents="none"/>}
       </g>
     </svg>
+    {tool&&<div ref={cursorRef} className="ink-cursor" aria-hidden="true"/>}
     {editingNode&&<NodeEditor key={editingNode.id} node={editingNode} transform={transform}
       onCommit={label=>onCommitEdit(editingNode.id,label)} onCancel={onCancelEdit}/>}
     </>
