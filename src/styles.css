@@ -162,6 +162,8 @@ kbd{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 
 @media(hover:hover) and (pointer:fine){#canvas.inking:not(.dragging){cursor:none}}
 #canvas.inking.dragging{cursor:grabbing}
 .ink-cursor{position:absolute;left:0;top:0;z-index:7;pointer-events:none;opacity:0;border-radius:50%;background:var(--c);box-shadow:0 0 0 1.5px var(--surface),0 0 0 2.5px rgba(16,20,40,.25);will-change:transform}
+.ink-cursor.laser{background:#ff3b30;box-shadow:0 0 0 2px rgba(255,255,255,.85),0 0 10px 3px rgba(255,59,48,.65),0 0 22px 6px rgba(255,59,48,.3)}
+.laser-layer{position:absolute;inset:0;width:100%;height:100%;z-index:6;pointer-events:none}
 .ink-cursor.highlighter{border-radius:3px;opacity:.5}
 .ink-cursor.eraser{background:color-mix(in srgb,var(--surface) 55%,transparent);box-shadow:0 0 0 1.5px var(--ink-2),0 0 0 3px color-mix(in srgb,var(--surface) 70%,transparent)}
 .selection-rect{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5;stroke-dasharray:5 4;vector-effect:non-scaling-stroke}

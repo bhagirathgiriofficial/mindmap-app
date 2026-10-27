@@ -314,6 +314,7 @@ export default function App() {
 
   // Steps the active tool's size up or down through its presets.
   function stepSize(dir) {
+    if (tool === "laser") return;
     const [list, key] =
       tool === "eraser" ? [ERASER_SIZES, "eraserSize"] : [PEN_SIZES, "size"];
     const i = list.indexOf(inkPrefs[key]);
@@ -694,6 +695,7 @@ export default function App() {
       if (!k.hasData) return;
       if (key === "p") k.toggleTool("pen");
       else if (key === "e") k.toggleTool("eraser");
+      else if (key === "l") k.toggleTool("laser");
       else if (key === "h") {
         k.changeInkPrefs({
           highlighter: !(k.tool === "pen" && k.inkPrefs.highlighter),
@@ -785,7 +787,7 @@ export default function App() {
 
         {data && (
           <>
-            {tool && (
+            {(tool === "pen" || tool === "eraser") && (
               <InkPanel
                 tool={tool}
                 prefs={inkPrefs}

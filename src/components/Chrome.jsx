@@ -1,7 +1,7 @@
 import {forwardRef} from "react";
 import {
   PanelLeft,Moon,Sun,FileJson,Maximize,Minimize,Undo2,ListTree,ListCollapse,
-  Palette,Plus,Minus,Scan,Keyboard,Columns2,PanelRight,PenLine,Eraser
+  Palette,Plus,Minus,Scan,Keyboard,Columns2,PanelRight,PenLine,Eraser,WandSparkles
 } from "lucide-react";
 import {UNDO_LIMIT} from "../lib/constants.js";
 
@@ -60,6 +60,7 @@ export const Dock=forwardRef(function Dock({undoCount,colorMode,tool,penColor,on
         <span className="pen-chip" style={{"--c":penColor==="ink"?"var(--ink)":penColor}}/>
       </IconButton>
       <IconButton icon={Eraser} label="Eraser" shortcut="E" active={tool==="eraser"} onClick={()=>onTool("eraser")}/>
+      <IconButton icon={WandSparkles} label="Laser pointer" shortcut="L" active={tool==="laser"} onClick={()=>onTool("laser")}/>
       <IconButton className="show-mobile" icon={Scan} label="Fit view" onClick={onFit}/>
       <IconButton className="hide-mobile" icon={Keyboard} label="Shortcuts" shortcut="?" onClick={onHelp}/>
     </div>

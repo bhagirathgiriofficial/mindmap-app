@@ -13,6 +13,7 @@ A lightweight, offline-first interactive mind-map presentation app built with Re
 - Multiple maps stored in browser `localStorage`, with search, duplicate, and delete
 - Edit node text in place and delete nodes (with undo)
 - Click-to-color styling with preset swatches and a custom picker
+- A laser pointer (**L**) for presenting: a glowing trail that fades on its own and is never saved
 - Whiteboard-style ink: a smooth, pressure-sensitive pen (**P**) and highlighter (**H**) with 8 colors, a custom color, and 5 sizes; an eraser (**E**) with 4 sizes that erases precisely or whole strokes; palm rejection and the stylus eraser end are supported
 - 10-step undo per map (covers ink too); **O** opens (expands) every branch
 - Touch-friendly: pinch to zoom, bottom dock and sheets on phones
@@ -141,7 +142,9 @@ This means:
 | Pan | Drag the canvas, two-finger scroll | |
 | Zoom | Ctrl/Cmd + scroll, pinch, **+ / −** buttons | **+** / **−** |
 | Fit view | Zoom percentage or fit button | **F** |
-| Expand all / collapse all | Dock buttons | **E** / **C** |
+| Expand all / collapse all | Dock buttons | **O** / **C** |
+| Pen / highlighter / eraser | Dock buttons | **P** / **H** / **E** |
+| Laser pointer (fades, not saved) | Dock button | **L** |
 | Undo | Dock button | **Ctrl/Cmd+Z** |
 | Shortcuts list | Keyboard button | **?** |
 | Fullscreen | Top-right button | |

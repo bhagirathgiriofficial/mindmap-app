@@ -27,6 +27,7 @@ const SHORTCUTS=[
     ["Pen on / off",["P"]],
     ["Eraser on / off",["E"]],
     ["Highlighter",["H"]],
+    ["Laser pointer on / off",["L"]],
     ["Pen color",["1","–","8"]],
     ["Smaller / bigger",["[","]"]],
     ["Pan while drawing","Scroll · middle-drag"],

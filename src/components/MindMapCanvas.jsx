@@ -4,6 +4,7 @@ import {useTweenedNodes} from "../hooks/animation.js";
 import {contrastText} from "../lib/tree.js";
 import {addPoint,eraseSegment,makeStroke} from "../lib/ink.js";
 import InkLayer from "./InkLayer.jsx";
+import LaserLayer from "./LaserLayer.jsx";
 
 const PINCH_MIN=.18,PINCH_MAX=3.2;
 const TOGGLE_R=10;
@@ -31,6 +32,8 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
   const inkRef=useRef(null);
   const cursorRef=useRef(null);
   const ink=useRef(null);
+  const laserRef=useRef(null);
+  const laser=useRef(null);
   // After a stylus is used, fingers pan instead of drawing (palm rejection).
   const penSeen=useRef(false);
 
@@ -41,7 +44,20 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
   const latest=useRef({});
   latest.current={zoomAt,cancelInk};
 
+  /* Laser: a fading trail in screen space, never saved */
+  function laserPoint(e){
+    const rect=svgRef.current.getBoundingClientRect();
+    return[e.clientX-rect.left,e.clientY-rect.top];
+  }
+  function endLaser(){
+    if(!laser.current)return;
+    try{svgRef.current.releasePointerCapture(laser.current.pointerId)}catch{}
+    laser.current=null;
+    laserRef.current?.end();
+  }
+
   function cancelInk(){
+    endLaser();
     const d=ink.current;
     if(!d)return;
     ink.current=null;
@@ -71,6 +87,11 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
     if(!el)return;
     if(!tool||e.pointerType==="touch"){el.style.opacity="0";return}
     const rect=svgRef.current.getBoundingClientRect();
+    if(tool==="laser"){
+      el.className="ink-cursor laser";
+      el.style.cssText=`opacity:1;width:12px;height:12px;transform:translate(${e.clientX-rect.left-6}px,${e.clientY-rect.top-6}px);`;
+      return;
+    }
     const eraser=erasing||tool==="eraser";
     const d=eraser?inkPrefs.eraserSize:inkPrefs.highlighter?inkPrefs.size*3+8:Math.max(4,inkPrefs.size);
     el.className="ink-cursor"+(eraser?" eraser":"")+(inkPrefs.highlighter&&!eraser?" highlighter":"");
@@ -142,7 +163,14 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
       e.stopPropagation();
       if(!e.isPrimary){cancelInk();return}
       if(e.button!==0&&!(e.pointerType==="pen"&&e.button===5))return;
-      if(ink.current)cancelInk();
+      if(ink.current||laser.current)cancelInk();
+      if(tool==="laser"){
+        laser.current={pointerId:e.pointerId};
+        laserRef.current?.start(...laserPoint(e));
+        moveCursor(e);
+        try{svgRef.current.setPointerCapture(e.pointerId)}catch{}
+        return;
+      }
       startInk(e);
       return;
     }
@@ -167,6 +195,11 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
   function handlePointerMove(e){
     if(tool)moveCursor(e,ink.current?.erasing);
     if(ink.current&&e.pointerId===ink.current.pointerId){moveInk(e);return}
+    if(laser.current&&e.pointerId===laser.current.pointerId){
+      const events=e.nativeEvent.getCoalescedEvents?.()||[];
+      for(const ev of events.length?events:[e.nativeEvent])laserRef.current?.move(...laserPoint(ev));
+      return;
+    }
     const drag=selection.current;
     if(drag&&e.pointerId===drag.pointerId){
       if(!drag.moved&&Math.hypot(e.clientX-drag.clientX,e.clientY-drag.clientY)<5)return;
@@ -190,6 +223,7 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
 
   function handlePointerUp(e){
     if(ink.current&&e.pointerId===ink.current.pointerId){endInk();return}
+    if(laser.current&&e.pointerId===laser.current.pointerId){endLaser();return}
     const drag=selection.current;
     if(drag&&e.pointerId===drag.pointerId){
       if(!drag.moved){
@@ -349,6 +383,7 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
         {selectionRect&&<rect className="selection-rect" {...selectionRect} pointerEvents="none"/>}
       </g>
     </svg>
+    {tool==="laser"&&<LaserLayer ref={laserRef}/>}
     {tool&&<div ref={cursorRef} className="ink-cursor" aria-hidden="true"/>}
     {editingNode&&<NodeEditor key={editingNode.id} node={editingNode} transform={transform}
       onCommit={label=>onCommitEdit(editingNode.id,label)} onCancel={onCancelEdit}/>}
