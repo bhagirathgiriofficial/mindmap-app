@@ -18,6 +18,8 @@ const SHORTCUTS=[
     ["Undo",[MOD,"Z"]]
   ]],
   ["Edit",[
+    ["Add a child idea","Hover · click +"],
+    ["Add child / sibling while typing",["Tab","⇧Tab"]],
     ["Edit node text","Double-click"],
     ["Node menu","Right-click · long-press"],
     ["Edit selected node",["Enter"]],
@@ -92,7 +94,7 @@ export function EmptyState({onCreate,onExample}){
           <rect x="92" y="58" width="48" height="20" rx="8" fill="#43c7a4"/>
         </svg>
         <h2>Start your first mind map</h2>
-        <p>Paste a JSON outline — written by hand or generated with AI — and get an interactive, presentable map.</p>
+        <p>Build it node by node, or paste a JSON outline — written by hand or generated with AI — and get an interactive, presentable map.</p>
         <div className="empty-actions">
           <button className="primary-btn" onClick={onCreate}><Plus size={17} strokeWidth={2.2}/>New map</button>
           <button className="secondary-btn" onClick={onExample}><Sparkles size={16}/>Try the example</button>

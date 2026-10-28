@@ -150,3 +150,39 @@ export function presentationSteps(root){
   if(steps.length>1)steps.push({kind:"all",id:root.id,label:root.label,path:[]});
   return steps;
 }
+
+export function newNode(label){
+  return {id:"n_"+Math.random().toString(36).slice(2,10),label};
+}
+
+// Returns a new tree with `node` appended to the children of `parentId`.
+export function addChild(root,parentId,node){
+  return (function walk(n){
+    const next={...n};
+    if(n.id===parentId)next.children=[...(n.children||[]),node];
+    else if(n.children)next.children=n.children.map(walk);
+    return next;
+  })(root);
+}
+
+// Returns a new tree with `node` inserted right after `siblingId`.
+export function addSibling(root,siblingId,node){
+  return (function walk(n){
+    const next={...n};
+    if(n.children){
+      const i=n.children.findIndex(c=>c.id===siblingId);
+      next.children=i<0?n.children.map(walk):[...n.children.slice(0,i+1),node,...n.children.slice(i+1)];
+    }
+    return next;
+  })(root);
+}
+
+// Id of the node whose children include `id`, or null for the root.
+export function parentOf(root,id){
+  for(const c of root?.children||[]){
+    if(c.id===id)return root.id;
+    const found=parentOf(c,id);
+    if(found)return found;
+  }
+  return null;
+}

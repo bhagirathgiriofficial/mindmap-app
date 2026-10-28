@@ -9,7 +9,7 @@ A lightweight, offline-first interactive mind-map presentation app built with Re
 - Smooth animations when expanding, collapsing, and fitting the view
 - Light and dark themes (follows your system on first visit)
 - Keyboard shortcuts (press **?** to see them all)
-- Paste JSON to create a new mind map, with live validation and a Format button
+- Build a map by hand from a central topic (hover a node and click **+**, or press **Tab** while typing), or paste JSON to create one, with live validation and a Format button
 - Multiple maps stored in browser `localStorage`, with search, duplicate, and delete
 - Edit node text in place and delete nodes (with undo)
 - Click-to-color styling with preset swatches and a custom picker
@@ -99,10 +99,19 @@ Each node supports:
 - `textColor` — optional hex text color; otherwise automatic contrast is used
 - `children` — optional array of child nodes
 
+## Build a map by hand
+
+1. Click **New map**, keep **Build manually** selected, enter a name and a central topic, and press **Enter**.
+2. Hover any node and click the **+** beside it to add a child (the central topic shows its **+** until it has branches). You can also right-click a node (long-press on touch screens) for **Add child** and **Add sibling**.
+3. A new node opens ready to type. Press **Enter** to save, **Tab** to save and add a child under it, or **Shift+Tab** to save and add a sibling. **Escape** (or leaving it empty) removes a node you just added.
+4. In selection mode, with one node selected, **Tab** adds a child and **Shift+Tab** a sibling.
+
+Each added node counts as one undo step. Hand-built maps are ordinary maps: **Edit JSON** shows and edits their JSON like any other.
+
 ## Edit and delete nodes
 
 - **Edit text:** double-click a node, type, then press **Enter** (or click away) to save. **Escape** cancels. Empty text is not allowed.
-- **Node menu:** right-click a node (long-press on touch screens) for **Edit text**, **Color…** and **Delete**.
+- **Node menu:** right-click a node (long-press on touch screens) for **Add child**, **Add sibling**, **Edit text**, **Color…** and **Delete**.
 - **Delete:** removes the node and everything below it. The central topic can't be deleted. A message with an **Undo** button appears after each delete.
 - **In selection mode:** with nodes selected, press **Delete** / **Backspace** to delete them, or **Enter** / **F2** to edit a single selected node. The style panel has the same **Edit text** and **Delete** buttons.
 
@@ -137,6 +146,8 @@ This means:
 | Action | Mouse / touch | Keyboard |
 | --- | --- | --- |
 | Open / close a branch | Click a node or its badge | |
+| Add a child | Hover a node, click **+** · node menu | **Tab** (while typing or selected) |
+| Add a sibling | Node menu | **Shift+Tab** (while typing or selected) |
 | Edit node text | Double-click a node | **Enter** (selected node) |
 | Node menu | Right-click / long-press a node | |
 | Delete nodes | Node menu | **Delete** (selected nodes) |

@@ -152,6 +152,13 @@ kbd{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 
 .toggle circle{stroke-width:1.6;filter:drop-shadow(0 1px 2px rgba(16,20,40,.12))}
 .toggle path{stroke-width:1.8;stroke-linecap:round}
 .toggle-count{font:700 10px var(--font);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.add-btn{cursor:pointer;opacity:0;transition:opacity .15s}
+.add-btn .hit{fill:transparent;filter:none!important}
+.add-btn circle:not(.hit){fill:var(--accent);filter:drop-shadow(0 1px 3px rgba(16,20,40,.2))}
+.add-btn path{stroke:#fff;stroke-width:1.8;stroke-linecap:round}
+.add-btn:hover circle:not(.hit){filter:drop-shadow(0 2px 6px rgba(16,20,40,.3)) brightness(1.08)}
+.node:hover .add-btn,.add-btn.always{opacity:1}
+@media (hover:none){.add-btn:not(.always){display:none}}
 @media(hover:hover){
   .toggle:not(.collapsed){opacity:0}
   .node:hover .toggle{opacity:1}
@@ -282,6 +289,10 @@ kbd{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 
 .field input,.field textarea{width:100%;border:1px solid var(--border-strong);border-radius:11px;padding:10px 12px;outline:none;background:var(--surface-2);color:var(--ink);font-size:15px;transition:border-color .15s,box-shadow .15s,background .15s}
 .field input:focus,.field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);background:var(--surface)}
 .field textarea{height:340px;resize:vertical;font-family:var(--mono);font-size:12.5px;line-height:1.6;tab-size:2}
+.modal-tabs{padding:12px 22px 4px}
+.modal-tabs .segmented{display:inline-flex}
+.field-hint{margin:9px 0 0;color:var(--muted);font-size:12.5px;line-height:1.55}
+.field-hint kbd{height:19px;min-width:19px;font-size:10.5px}
 .validity{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12.5px;font-weight:500}
 .validity svg{flex:0 0 auto}
 .validity.ok{color:var(--ok)}
@@ -359,6 +370,7 @@ kbd{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 
   .overlay{padding:0;align-items:flex-end}
   .modal{width:100vw;max-width:none;max-height:94dvh;border-radius:20px 20px 0 0;border-bottom:0}
   .modal-head{padding:18px 16px 4px}
+  .modal-tabs{padding:10px 16px 2px}
   .modal-body{padding:12px 16px 16px}
   .field textarea{height:40dvh;min-height:220px;resize:none}
   .modal-actions{padding:12px 16px calc(12px + env(safe-area-inset-bottom))}

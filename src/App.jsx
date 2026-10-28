@@ -20,13 +20,17 @@ import { HelpDialog, EmptyState, Toast } from "./components/Overlays.jsx";
 import { EXAMPLE, LAYOUT_KEY, THEME_KEY, UNDO_LIMIT } from "./lib/constants.js";
 import { bootstrap, persist } from "./lib/storage.js";
 import {
+  addChild,
+  addSibling,
   buildStyleMap,
   countNodes,
   countRemoved,
   deepCopy,
   expandableIds,
   indexById,
+  newNode,
   normalizePayload,
+  parentOf,
   patchNodes,
   presentationSteps,
   removeNodes,
@@ -140,6 +144,10 @@ export default function App() {
   const canvasRef = useRef(null);
   const toastTimer = useRef(0);
   const firstFit = useRef(true);
+  // Projects as last committed, so several edits in one event build on each other.
+  const latest = useRef({ projects, activeId });
+  // A node just added and still being named; cancelling the edit removes it again.
+  const pendingNew = useRef(null);
 
   const styles = useMemo(() => buildStyleMap(data, theme), [data, theme]);
   // fontsReady re-measures labels once the web font replaces the fallback.
@@ -194,6 +202,7 @@ export default function App() {
     } catch {
       return false;
     }
+    latest.current = { projects: nextProjects, activeId: nextActiveId };
     setProjects(nextProjects);
     setActiveId(nextActiveId);
     return true;
@@ -307,22 +316,29 @@ export default function App() {
     };
   }, [selected, nodeIndex, styles]);
 
-  // Saves a new tree for the active map as one undo step. Returns false when nothing was saved.
-  function saveData(nextData, failMessage) {
-    if (!active || JSON.stringify(nextData) === JSON.stringify(active.data))
+  const latestData = () =>
+    latest.current.projects.find((p) => p.id === latest.current.activeId)
+      ?.data || null;
+
+  // Saves a new tree for the active map, normally as one undo step. Returns false when nothing was saved.
+  function saveData(nextData, failMessage, record = true) {
+    const { projects: all, activeId: id } = latest.current;
+    const current = all.find((p) => p.id === id);
+    if (!current || JSON.stringify(nextData) === JSON.stringify(current.data))
       return false;
-    const next = projects.map((p) =>
-      p.id === active.id ? { ...p, data: nextData, updatedAt: Date.now() } : p,
+    const next = all.map((p) =>
+      p.id === id ? { ...p, data: nextData, updatedAt: Date.now() } : p,
     );
-    if (!commit(next)) {
+    if (!commit(next, id)) {
       showToast(failMessage || "Could not save — browser storage may be full");
       return false;
     }
-    recordUndo(active.id, {
-      name: active.name,
-      data: active.data,
-      ink: active.ink,
-    });
+    if (record)
+      recordUndo(id, {
+        name: current.name,
+        data: current.data,
+        ink: current.ink,
+      });
     return true;
   }
 
@@ -407,16 +423,83 @@ export default function App() {
     setEditingId(id);
   }
 
-  function commitEdit(id, raw) {
+  // `then` ("child" or "sibling") adds and starts naming a new node after saving.
+  function commitEdit(id, raw, then) {
     setEditingId(null);
+    const isNew = pendingNew.current === id;
+    pendingNew.current = null;
+    const base = latestData();
+    if (!base) return;
     const label = raw.replace(/\s+/g, " ").trim();
     if (!label) {
+      if (isNew) {
+        discardNew(id);
+        return;
+      }
       showToast("A node needs some text — kept the old label");
-      return;
-    }
-    if (active && label !== nodeIndex.get(id)?.label)
-      saveData(patchNodes(active.data, new Set([id]), { label }));
+    } else if (label !== indexById(base).get(id)?.label)
+      // Naming a just-added node belongs to the undo step that added it.
+      saveData(patchNodes(base, new Set([id]), { label }), undefined, !isNew);
+    if (then) addNode(id, then === "sibling");
   }
+
+  function cancelEdit(id) {
+    setEditingId(null);
+    if (pendingNew.current === id) discardNew(id);
+    pendingNew.current = null;
+  }
+
+  // Removes a node that was added but never named, along with its undo step.
+  function discardNew(id) {
+    const base = latestData();
+    if (!base || !saveData(removeNodes(base, new Set([id])), undefined, false))
+      return;
+    undoHistories.current.get(latest.current.activeId)?.pop();
+    bumpUndo();
+  }
+
+  /* Build: add nodes by hand */
+  function addNode(targetId, asSibling) {
+    const base = latestData();
+    if (!base || present) return;
+    const parentId = asSibling ? parentOf(base, targetId) : targetId;
+    if (!parentId || !indexById(base).has(targetId)) return;
+    const node = newNode("New idea");
+    setNodeMenu(null);
+    const nextData = asSibling
+      ? addSibling(base, targetId, node)
+      : addChild(base, targetId, node);
+    if (!saveData(nextData)) return;
+    setExpanded((prev) => new Set([...prev, base.id, parentId]));
+    pendingNew.current = node.id;
+    setEditingId(node.id);
+  }
+
+  // Keeps the node being edited on screen, e.g. a new child added near the edge.
+  useEffect(() => {
+    if (!editingId) return;
+    const n = layoutRef.current.nodes.find((x) => x.id === editingId),
+      ws = workspaceRef.current;
+    if (!n || !ws) return;
+    const t = transformRef.current,
+      left = n.x * t.k + t.x,
+      top = n.y * t.k + t.y,
+      right = left + Math.max(n.w, 160) * t.k,
+      bottom = top + n.h * t.k;
+    const dx =
+      left < 40
+        ? 40 - left
+        : right > ws.clientWidth - 40
+          ? ws.clientWidth - 40 - right
+          : 0;
+    const dy =
+      top < 80
+        ? 80 - top
+        : bottom > ws.clientHeight - 110
+          ? ws.clientHeight - 110 - bottom
+          : 0;
+    if (dx || dy) animateTo({ ...t, x: t.x + dx, y: t.y + dy });
+  }, [editingId, animateTo, transformRef]);
 
   function deleteNodes(ids) {
     if (!active) return;
@@ -510,6 +593,8 @@ export default function App() {
         });
         if (!ok) return "Could not save — browser storage may be full.";
         setModal(null);
+        if (!normalized.data.children?.length)
+          showToast("Hover a node and click + to add ideas · Tab adds while typing");
         return null;
       }
       const p = projects.find((x) => x.id === modal.id);
@@ -719,6 +804,7 @@ export default function App() {
     zoomAt,
     startEdit,
     deleteNodes,
+    addNode,
     setTool,
     toggleTool,
     stepSize,
@@ -808,6 +894,11 @@ export default function App() {
         k.startEdit([...k.selected][0]);
         return;
       }
+      if (k.colorMode && k.selected.size === 1 && e.key === "Tab") {
+        e.preventDefault();
+        k.addNode([...k.selected][0], e.shiftKey);
+        return;
+      }
       if (mod || e.altKey) return;
       if (e.key === "?") {
         setHelp(true);
@@ -883,7 +974,8 @@ export default function App() {
           editingId={editingId}
           onStartEdit={startEdit}
           onCommitEdit={commitEdit}
-          onCancelEdit={() => setEditingId(null)}
+          onCancelEdit={cancelEdit}
+          onAddNode={(id) => addNode(id, false)}
           onNodeMenu={(id, x, y) => !present && setNodeMenu({ id, x, y })}
           focusIds={focusIds}
           presenting={!!present}
@@ -1007,6 +1099,8 @@ export default function App() {
           }
           onClose={closeNodeMenu}
           onEdit={() => startEdit(nodeMenu.id)}
+          onAddChild={() => addNode(nodeMenu.id, false)}
+          onAddSibling={() => addNode(nodeMenu.id, true)}
           onColor={() => {
             setNodeMenu(null);
             if (!colorMode) setColorMode(true);

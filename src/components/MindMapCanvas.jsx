@@ -17,7 +17,7 @@ const DOUBLE_CLICK_MS=220,LONG_PRESS_MS=520;
 const MindMapCanvas=forwardRef(function MindMapCanvas({
   layout,mode,transform,setTransform,transformRef,zoomAt,
   colorMode,selected,onEnterColorMode,onSelectionChange,onSelectNode,onToggleNode,
-  editingId,onStartEdit,onCommitEdit,onCancelEdit,onNodeMenu,
+  editingId,onStartEdit,onCommitEdit,onCancelEdit,onAddNode,onNodeMenu,
   tool,inkPrefs,strokes,onInkChange,focusIds,presenting
 },ref){
   const svgRef=useRef(null);
@@ -319,6 +319,12 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
     if(!colorMode)onStartEdit(n.id);
   }
 
+  function handleAddClick(e,n){
+    e.stopPropagation();
+    clearTimeout(clickTimer.current);
+    onAddNode(n.id);
+  }
+
   function handleContextMenu(e,n){
     e.preventDefault();e.stopPropagation();
     clearTimeout(clickTimer.current);
@@ -347,7 +353,7 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
   // One stable handler object lets memoized nodes skip re-rendering while panning;
   // its methods are refreshed every render so they always see current props.
   const nodeHandlers=useRef({}).current;
-  Object.assign(nodeHandlers,{handleNodeClick,handleToggleClick,handleDoubleClick,handleContextMenu,handleNodePointerDown,cancelLongPress});
+  Object.assign(nodeHandlers,{handleNodeClick,handleToggleClick,handleDoubleClick,handleAddClick,handleContextMenu,handleNodePointerDown,cancelLongPress});
   const linkPaths=useMemo(()=>links.map(l=><path key={l.id} className="branch" d={l.d} fill={l.color}
     opacity={l.opacity*.9*(focusIds&&!focusIds.has(l.id)?.22:1)}/>),[links,focusIds]);
 
@@ -355,6 +361,7 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
   const grid=24*transform.k;
 
   const editingNode=editingId&&layout.nodes.find(n=>n.id===editingId);
+  const canAdd=!presenting&&!tool&&!colorMode;
 
   return(
     <>
@@ -379,7 +386,7 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
         </g>
         <g className="nodes">
           {nodes.map(n=><MapNode key={n.id} n={n} mode={mode} selected={selected.has(n.id)} editing={n.id===editingId}
-            dimmed={!!focusIds&&!focusIds.has(n.id)}
+            dimmed={!!focusIds&&!focusIds.has(n.id)} canAdd={canAdd}
             handlers={nodeHandlers}/>)}
         </g>
         <InkLayer ref={inkRef} strokes={strokes}/>
@@ -389,7 +396,7 @@ const MindMapCanvas=forwardRef(function MindMapCanvas({
     {tool==="laser"&&<LaserLayer ref={laserRef} size={inkPrefs.laserSize}/>}
     {tool&&<div ref={cursorRef} className="ink-cursor" aria-hidden="true"/>}
     {editingNode&&<NodeEditor key={editingNode.id} node={editingNode} transform={transform}
-      onCommit={label=>onCommitEdit(editingNode.id,label)} onCancel={onCancelEdit}/>}
+      onCommit={(label,then)=>onCommitEdit(editingNode.id,label,then)} onCancel={()=>onCancelEdit(editingNode.id)}/>}
     </>
   );
 });
@@ -409,10 +416,11 @@ function NodeEditor({node,transform,onCommit,onCancel}){
     el.style.height=Math.max(node.h*k,el.scrollHeight)+"px";
   },[value,k,node.h]);
 
-  const finish=save=>{
+  // `then` is "child" or "sibling" to keep building after saving.
+  const finish=(save,then)=>{
     if(done.current)return;
     done.current=true;
-    save?onCommit(value):onCancel();
+    save?onCommit(value,then):onCancel();
   };
 
   return(
@@ -421,6 +429,7 @@ function NodeEditor({node,transform,onCommit,onCancel}){
       onChange={e=>setValue(e.target.value.replace(/\n/g," "))}
       onKeyDown={e=>{
         if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();finish(true)}
+        else if(e.key==="Tab"){e.preventDefault();finish(true,e.shiftKey?"sibling":"child")}
         else if(e.key==="Escape"){e.preventDefault();e.stopPropagation();finish(false)}
       }}
       onBlur={()=>finish(true)}
@@ -433,12 +442,15 @@ function NodeEditor({node,transform,onCommit,onCancel}){
   );
 }
 
-const MapNode=memo(function MapNode({n,mode,selected,editing,dimmed,handlers:h}){
+const MapNode=memo(function MapNode({n,mode,selected,editing,dimmed,canAdd,handlers:h}){
   const style=nodeStyle(n.depth);
   const radius=Math.min(style.radius,n.h/2);
   // The root's toggle only appears when it would not sit on top of a branch.
   const showToggle=n.hasChildren&&(!n.root||!n.expanded||mode==="right");
   const tx=n.side>0?n.w+TOGGLE_R+3:-TOGGLE_R-3,ty=n.h/2;
+  // The add button sits past the toggle; the root's goes below it, clear of the branches.
+  const reach=(showToggle?TOGGLE_R*2+6:0)+TOGGLE_R+3;
+  const [ax,ay]=n.root?[n.w/2,n.h+TOGGLE_R+6]:[n.side>0?n.w+reach:-reach,n.h/2];
   return(
     <g className={`node depth-${Math.min(n.depth,2)}${n.root?" root":""}${selected?" selected":""}${dimmed?" dimmed":""}`}
       transform={`translate(${n.x},${n.y})`} opacity={n.opacity??1}
@@ -464,6 +476,15 @@ const MapNode=memo(function MapNode({n,mode,selected,editing,dimmed,handlers:h})
           {n.expanded
             ?<path d="M-4 0H4" stroke={n.topColor}/>
             :<text fill={contrastText(n.topColor)} className="toggle-count">{n.childCount>99?"99+":n.childCount}</text>}
+        </g>
+      )}
+      {canAdd&&!editing&&(
+        <g className={"add-btn"+(n.root&&!n.hasChildren?" always":"")} transform={`translate(${ax},${ay})`}
+          onClick={e=>h.handleAddClick(e,n)} onDoubleClick={e=>e.stopPropagation()}>
+          <title>Add a child idea</title>
+          <circle className="hit" r={TOGGLE_R+7}/>
+          <circle r={TOGGLE_R}/>
+          <path d="M-4.5 0H4.5M0 -4.5V4.5"/>
         </g>
       )}
     </g>

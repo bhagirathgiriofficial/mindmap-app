@@ -1,8 +1,8 @@
 import {useEffect,useRef} from "react";
-import {Pencil,Trash2,Palette} from "lucide-react";
+import {Pencil,Trash2,Palette,CornerDownRight,ListPlus} from "lucide-react";
 
 // Right-click / long-press menu for a single node.
-export default function NodeMenu({x,y,isRoot,removeCount,onEdit,onColor,onDelete,onClose}){
+export default function NodeMenu({x,y,isRoot,removeCount,onEdit,onAddChild,onAddSibling,onColor,onDelete,onClose}){
   const ref=useRef(null);
 
   useEffect(()=>{
@@ -25,8 +25,11 @@ export default function NodeMenu({x,y,isRoot,removeCount,onEdit,onColor,onDelete
   return(
     <div className="menu-pop" role="menu" ref={ref} style={{
       left:Math.max(8,Math.min(window.innerWidth-208,x)),
-      top:Math.max(8,Math.min(window.innerHeight-160,y))
+      top:Math.max(8,Math.min(window.innerHeight-250,y))
     }}>
+      <button role="menuitem" onClick={onAddChild}><CornerDownRight size={15}/>Add child<kbd>Tab</kbd></button>
+      {!isRoot&&<button role="menuitem" onClick={onAddSibling}><ListPlus size={15}/>Add sibling<kbd>⇧Tab</kbd></button>}
+      <div className="menu-sep"/>
       <button role="menuitem" onClick={onEdit}><Pencil size={15}/>Edit text<kbd>Enter</kbd></button>
       <button role="menuitem" onClick={onColor}><Palette size={15}/>Color…</button>
       <div className="menu-sep"/>
