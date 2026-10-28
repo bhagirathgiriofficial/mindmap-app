@@ -10,7 +10,7 @@ A lightweight, offline-first interactive mind-map presentation app built with Re
 - Light and dark themes (follows your system on first visit)
 - Keyboard shortcuts (press **?** to see them all)
 - Build a map by hand from a central topic (hover a node and click **+**, or press **Tab** while typing), or paste JSON to create one, with live validation and a Format button
-- Multiple maps stored in browser `localStorage`, with search, duplicate, and delete
+- Multiple maps stored in the browser's IndexedDB, with search, duplicate, and delete
 - Edit node text in place and delete nodes (with undo)
 - Click-to-color styling with preset swatches and a custom picker
 - Presentation mode (**F5** or the Present button): steps through each branch with the arrow keys, zooming to it and dimming the rest
@@ -26,7 +26,7 @@ A lightweight, offline-first interactive mind-map presentation app built with Re
 - `src/main.jsx` — React entry point
 - `src/App.jsx` — app state: projects, expansion, pan/zoom, selection, undo
 - `src/components/` — `Sidebar`, `Toolbar`, `MindMapCanvas` (SVG rendering and gestures), `ColorPanel`, `ProjectModal`, `ProjectMenu`
-- `src/lib/` — tree helpers, layout, `localStorage` persistence, and constants
+- `src/lib/` — tree helpers, layout, IndexedDB persistence, and constants
 - `src/styles.css` — all UI and mind-map styling
 
 ## Run locally
@@ -132,7 +132,7 @@ Click **Undo** in the dock or press **Ctrl+Z / Cmd+Z** to undo up to 10 color ch
 
 ## Storage
 
-Projects are stored locally in the browser using `localStorage`.
+Projects are stored locally in the browser using IndexedDB, one record per map, so saving a change only rewrites the map that changed. Maps saved by earlier versions in `localStorage` move to IndexedDB automatically the first time the app opens, and the old copy is removed once the move succeeds. If IndexedDB isn't available (for example in some private-browsing modes), the app falls back to `localStorage`. Small preferences (theme, layout, ink settings) stay in `localStorage`.
 
 This means:
 
@@ -171,7 +171,7 @@ Layout (balanced or right) and theme (light or dark) are in the top-right bar an
 - [Lucide](https://lucide.dev) icons and the Inter font, bundled for offline use
 - CSS3
 - SVG for nodes and connectors
-- `localStorage` for persistence
+- IndexedDB for persistence
 
 ## License
 

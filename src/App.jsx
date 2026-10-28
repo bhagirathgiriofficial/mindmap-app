@@ -49,7 +49,6 @@ import {
   saveInkPrefs,
 } from "./lib/ink.js";
 
-const initial = bootstrap();
 const mobileQuery = window.matchMedia("(max-width: 768px)");
 const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
 const NEXT_KEYS = new Set(["ArrowRight", "ArrowDown", "PageDown", " ", "Enter"]);
@@ -98,7 +97,7 @@ const stepExpansion = (step, root) =>
 const initialTheme = readPref(THEME_KEY, darkQuery.matches ? "dark" : "light");
 document.documentElement.dataset.theme = initialTheme;
 
-export default function App() {
+export default function App({ initial }) {
   const [projects, setProjects] = useState(initial.projects);
   const [activeId, setActiveId] = useState(initial.activeId);
   const active = projects.find((p) => p.id === activeId) || null;
@@ -196,12 +195,11 @@ export default function App() {
   }
 
   /* Persistence */
+  // Updates the maps at once and saves them to IndexedDB in the background.
   function commit(nextProjects, nextActiveId = activeId) {
-    try {
-      persist(nextProjects, nextActiveId);
-    } catch {
-      return false;
-    }
+    persist(nextProjects, nextActiveId).catch(() =>
+      showToast("Could not save — browser storage may be full"),
+    );
     latest.current = { projects: nextProjects, activeId: nextActiveId };
     setProjects(nextProjects);
     setActiveId(nextActiveId);

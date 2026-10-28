@@ -61,7 +61,7 @@ export const EXAMPLE={
         {label:"Edit JSON anytime"},
         {label:"Duplicate a project"},
         {label:"Delete projects you no longer need"},
-        {label:"Everything saves in localStorage"}
+        {label:"Everything saves in this browser"}
       ]}
     ]
   }
