@@ -1,7 +1,7 @@
 import {forwardRef} from "react";
 import {
   PanelLeft,Moon,Sun,FileJson,Maximize,Minimize,Undo2,ListTree,ListCollapse,
-  Palette,Plus,Minus,Scan,Keyboard,Columns2,PanelRight,PenLine,Eraser,WandSparkles,Play
+  Palette,Plus,Minus,Scan,Keyboard,Columns2,PanelRight,PenLine,Eraser,WandSparkles,Play,FileDown
 } from "lucide-react";
 import {UNDO_LIMIT} from "../lib/constants.js";
 
@@ -18,7 +18,7 @@ export function IconButton({icon:Icon,label,shortcut,active,className="",childre
   );
 }
 
-export function TopBar({title,meta,sidebarOpen,onToggleSidebar,theme,onToggleTheme,mode,onSetMode,onEdit,fullscreen,onFullscreen,onPresent,hasData}){
+export function TopBar({title,meta,sidebarOpen,onToggleSidebar,theme,onToggleTheme,mode,onSetMode,onEdit,onExportPdf,fullscreen,onFullscreen,onPresent,hasData}){
   return(
     <>
       <div className="topbar topbar-left glass">
@@ -39,6 +39,7 @@ export function TopBar({title,meta,sidebarOpen,onToggleSidebar,theme,onToggleThe
         <IconButton icon={theme==="dark"?Sun:Moon} label={theme==="dark"?"Light mode":"Dark mode"} onClick={onToggleTheme}/>
         {hasData&&<button className="pill-btn present-btn" onClick={onPresent} data-tip="Present · F5"><Play size={15} strokeWidth={2.1}/><span>Present</span></button>}
         {hasData&&<button className="pill-btn" onClick={onEdit}><FileJson size={16} strokeWidth={1.9}/><span>Edit JSON</span></button>}
+        {hasData&&<IconButton className="hide-mobile" icon={FileDown} label="Export PDF" onClick={onExportPdf}/>}
         <IconButton className="hide-mobile" icon={fullscreen?Minimize:Maximize} label={fullscreen?"Exit fullscreen":"Fullscreen"} onClick={onFullscreen}/>
       </div>
     </>

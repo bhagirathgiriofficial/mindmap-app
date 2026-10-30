@@ -25,7 +25,10 @@ function measureText(text,style){
   return m;
 }
 
-// Wraps text the way the label <div> will and returns its line count and widest line.
+// The label's text split into the rows it wraps to.
+export function labelRows(text,depth){return measureText(text,nodeStyle(depth)).rows}
+
+// Wraps text the way the label <div> will and returns its rows, their count and the widest one.
 function wrapText(text,style){
   measureCtx.font=`${style.weight} ${style.size}px ${FONT_FAMILY}`;
   const width=s=>measureCtx.measureText(s).width;
@@ -36,13 +39,18 @@ function wrapText(text,style){
     else{lines.push(line);line=word}
   }
   if(line)lines.push(line);
-  let count=0,widest=0;
+  const rows=[];let widest=0;
   for(const l of lines){
-    const w=width(l);
-    count+=Math.max(1,Math.ceil(w/style.maxText)); // overlong words break with overflow-wrap
-    widest=Math.max(widest,Math.min(w,style.maxText));
+    // Overlong words break with overflow-wrap.
+    let row="";
+    for(const ch of width(l)>style.maxText?l:[]){
+      if(row&&width(row+ch)>style.maxText){rows.push(row);row=ch}
+      else row+=ch;
+    }
+    rows.push(row||l);
+    widest=Math.max(widest,Math.min(width(l),style.maxText));
   }
-  return{lines:Math.max(1,count),width:widest};
+  return{lines:Math.max(1,rows.length),width:widest,rows};
 }
 
 /*

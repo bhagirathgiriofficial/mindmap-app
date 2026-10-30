@@ -16,6 +16,7 @@ A lightweight, offline-first interactive mind-map presentation app built with Re
 - Presentation mode (**F5** or the Present button): steps through each branch with the arrow keys, zooming to it and dimming the rest
 - A laser pointer (**L**) for presenting: a glowing trail that fades on its own and is never saved
 - Whiteboard-style ink: a smooth, pressure-sensitive pen (**P**) and highlighter (**H**) with 8 colors, a custom color, and 5 sizes; an eraser (**E**) with 4 sizes that erases precisely or whole strokes; palm rejection and the stylus eraser end are supported
+- Export to PDF: downloads the whole map with every branch open on a single page, including ink, in the current theme and layout (collapsed branches on screen stay collapsed)
 - 10-step undo per map (covers ink too); **O** opens (expands) every branch
 - Touch-friendly: pinch to zoom, bottom dock and sheets on phones
 - No backend, database, or internet connection required at runtime
@@ -158,6 +159,7 @@ This means:
 | Pen / highlighter / eraser | Dock buttons | **P** / **H** / **E** |
 | Laser pointer (fades, not saved) | Dock button | **L** |
 | Present: start / next / previous / end | Present button, bar arrows, click a branch | **F5** / **→** / **←** / **Esc** |
+| Export PDF | Top-right button · map's **⋯** menu in the sidebar | |
 | Undo | Dock button | **Ctrl/Cmd+Z** |
 | Shortcuts list | Keyboard button | **?** |
 | Fullscreen | Top-right button | |

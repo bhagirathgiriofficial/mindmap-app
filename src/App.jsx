@@ -48,6 +48,7 @@ import {
   loadInkPrefs,
   saveInkPrefs,
 } from "./lib/ink.js";
+import { buildMapPdf, downloadBlob, pdfFilename } from "./lib/pdf.js";
 
 const mobileQuery = window.matchMedia("(max-width: 768px)");
 const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
@@ -143,6 +144,7 @@ export default function App({ initial }) {
   const canvasRef = useRef(null);
   const toastTimer = useRef(0);
   const firstFit = useRef(true);
+  const exportingPdf = useRef(false);
   // Projects as last committed, so several edits in one event build on each other.
   const latest = useRef({ projects, activeId });
   // A node just added and still being named; cancelling the edit removes it again.
@@ -665,6 +667,23 @@ export default function App({ initial }) {
     if (activeId === id) showProject(next.find((x) => x.id === nextActive));
   }
 
+  // Exports the whole map with every branch open; the view on screen is left alone.
+  async function exportPdf(id) {
+    const p = projects.find((x) => x.id === id);
+    if (!p || exportingPdf.current) return;
+    exportingPdf.current = true;
+    showToast("Preparing PDF…");
+    try {
+      const filename = pdfFilename(p.name);
+      downloadBlob(await buildMapPdf(p, theme, mode), filename);
+      showToast(`Saved ${filename}`);
+    } catch {
+      showToast("Could not create the PDF");
+    } finally {
+      exportingPdf.current = false;
+    }
+  }
+
   const closeMenu = useCallback(() => setMenu(null), []);
   const closeHelp = useCallback(() => setHelp(false), []);
   const closeNodeMenu = useCallback(() => setNodeMenu(null), []);
@@ -993,6 +1012,7 @@ export default function App({ initial }) {
           mode={mode}
           onSetMode={changeMode}
           onEdit={() => activeId && openModal("edit", activeId)}
+          onExportPdf={() => exportPdf(activeId)}
           fullscreen={fullscreen}
           onFullscreen={toggleFullscreen}
           onPresent={startPresentation}
@@ -1115,6 +1135,10 @@ export default function App({ initial }) {
           onEdit={() => {
             setMenu(null);
             openModal("edit", menu.id);
+          }}
+          onExportPdf={() => {
+            setMenu(null);
+            exportPdf(menu.id);
           }}
           onDuplicate={() => {
             setMenu(null);
